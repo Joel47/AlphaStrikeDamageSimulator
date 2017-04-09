@@ -273,6 +273,7 @@ def one_vs_one(attacker, defender, range_band):
 
 
 if __name__ == "__main__":
+    # Set the second field to 10 to see everything, 20 to see some, and 30 to just see results
     logging_configure('', 30)
     random.seed()
     wins = [0,0,0]
