@@ -13,9 +13,16 @@ PROTOMECH = 2
 INFANTRY = 3
 BATTLEARMOR = 4
 
+TRACKED = 0
+NAVAL = 1
+WHEELED = 2
+HOVER = 3
+VTOL = 4
+WIGE = 5
+
 class CombatUnit(object):
 
-    def __init__(self, name, type, armor, structure, weapons, movement, skill, special=None):
+    def __init__(self, name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None):
         self.name = name
         self.type = type
         self.armor = armor
@@ -23,6 +30,7 @@ class CombatUnit(object):
         self.weapons = weapons
         self.movement = movement
         self.movement_mod = movement_mod(self.movement)
+        self.motive_type = motive_type
         self.skill = skill
         if not (special is None):
             self.special = special
@@ -47,6 +55,23 @@ class CombatUnit(object):
             else:
                 self.structure = 0
                 logging.info('Unit ' + self.name + ' destroyed.')
+
+    def motive_check(self):
+        if self.type == VEHICLE:
+            motive_roll = two_d6()
+            if self.motive_type == WHEELED or self.motive_type == HOVER:
+                motive_roll += 1
+            elif self.motive_type == VTOL or self.motive_type == WIGE:
+                motive_roll += 2
+            if motive_roll == 9 or motive_roll == 10:
+                self.movement = min(0, self.movement - 2)
+            elif motive_roll == 11:
+                movement_loss = divide_by_two_round_up(self.movement)
+                self.movement -= movement_loss
+            elif motive_roll == 12:
+                self.movement = 0
+            self.movement_mod = movement_mod(self.movement)
+
 
     def apply_crit(self, crit_roll):
         if self.type == MECH:
@@ -90,6 +115,49 @@ class CombatUnit(object):
                 self.structure = 0
             else:
                 logging.debug('No crit.')
+        elif self.type == VEHICLE:
+            if crit_roll == 2:
+                logging.debug('Ammo Explosion!')
+                if 'ENE' in self.special or 'CASEII' in self.special:
+                    logging.debug('Ignored due to ENE special.')
+                elif 'CASE' in self .special:
+                    logging.debug('CASE. Appling 1 extra damage.')
+                    self.apply_damage(1)
+                else:
+                    logging.debug('Unit destroyed.')
+                    self.structure = 0
+            elif crit_roll == 3:
+                logging.debug('Crew Stunned')
+                self.crits.append('Crew Stunned')
+                # TODO - figure out a way to implement this
+            elif crit_roll == 4 or crit_roll == 5:
+                logging.debug('Fire Control hit')
+                self.skill += 2
+            elif crit_roll == 9 or crit_roll == 10:
+                logging.debug('Weapon hit')
+                for range_band in [0, 1, 2]:
+                    self.weapons[range_band] = max(0, self.weapons[range_band] - 1)
+                logging.debug('Weapons now ' + str(self.weapons))
+            elif crit_roll == 11:
+                logging.debug('Crew killed!')
+                self.structure = 0
+            elif crit_roll == 12:
+                logging.debug('Engine Hit.')
+                if 'Engine Hit' in self.crits:
+                    logging.debug('Second hit; vehicle destroyed.')
+                    self.structure = 0
+                else:
+                    self.crits.append('Engine Hit')
+                    self.movement = divide_by_two_round_up(self.movement)
+                    self.movement_mod = movement_mod(self.movement)
+                    logging.debug('New movement mod: ' + str(self.movement_mod))
+                    for range_band in [0, 1, 2]:
+                        self.weapons[range_band] = divide_by_two_round_up(self.weapons[range_band])
+            else:
+                logging.debug('No crit.')
+        elif self.type == PROTOMECH:
+            logging.debug('Crits not yet implemented for Protomechs')
+            # TODO - implement crits
 
 
 def movement_mod(movement, jumped=False):
@@ -97,7 +165,9 @@ def movement_mod(movement, jumped=False):
         jump_mod = 1
     else:
         jump_mod = 0
-    if movement < 5:
+    if movement == 0 and not jumped:
+        return -4
+    elif movement < 5:
         return 0 + jump_mod
     elif movement < 9:
         return 1 + jump_mod
@@ -172,25 +242,27 @@ def roll_to_hit(skill, range_mod, def_mod, terrain=0):
         return False
 
 
-def one_vs_one(unit1, unit2, range_band):
+def one_vs_one(attacker, defender, range_band):
     round_count = 1
-    while unit1.structure > 0 and unit2.structure > 0:
+    while attacker.structure > 0 and defender.structure > 0:
         logging.info('========== ROUND ' + str(round_count) + ' ==========')
         # TODO - if movement_mod == 0, decrease skill by 1 to simulate standing still
-        logging.debug(unit1.name + ' attacks ' + unit2.name)
-        unit2_was_hit = roll_to_hit(unit1.skill, range_band * 2, unit2.movement_mod)
-        logging.debug(unit2.name + ' attacks ' + unit1.name)
-        unit1_was_hit = roll_to_hit(unit2.skill, range_band * 2, unit1.movement_mod)
-        if unit1_was_hit:
-            unit1.apply_damage(unit2.weapons[range_band])
-        if unit2_was_hit:
-            unit2.apply_damage(unit1.weapons[range_band])
+        logging.debug(attacker.name + ' attacks ' + defender.name)
+        defender_was_hit = roll_to_hit(attacker.skill, range_band * 2, defender.movement_mod)
+        logging.debug(defender.name + ' attacks ' + attacker.name)
+        attacker_was_hit = roll_to_hit(defender.skill, range_band * 2, attacker.movement_mod)
+        if attacker_was_hit:
+            attacker.motive_check()
+            attacker.apply_damage(defender.weapons[range_band])
+        if defender_was_hit:
+            defender.motive_check()
+            defender.apply_damage(attacker.weapons[range_band])
         round_count += 1
-    if unit1.structure > unit2.structure:
-        logging.info('Winner: ' + unit1.name)
+    if attacker.structure > defender.structure:
+        logging.info('Winner: ' + attacker.name)
         return 1
-    elif unit2.structure > unit1.structure:
-        logging.info('Winner: ' + unit2.name)
+    elif defender.structure > attacker.structure:
+        logging.info('Winner: ' + defender.name)
         return 2
     else:
         logging.info('Draw.')
