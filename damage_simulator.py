@@ -3,6 +3,9 @@ import os
 import shutil
 import random
 
+# To set variables, scroll down to the bottom
+
+# Constants for use below
 SHORT_RANGE = 0
 MEDIUM_RANGE = 1
 LONG_RANGE = 2
@@ -270,12 +273,14 @@ def one_vs_one(attacker, defender, range_band):
 
 
 if __name__ == "__main__":
-    logging_configure('', 10)
+    logging_configure('', 30)
     random.seed()
     wins = [0,0,0]
-    for battle in range(0,1):
-        attacker = CombatUnit('CPLT-C1', MECH, 5, 5, [2, 3, 2], 1, 4)
-        defender = CombatUnit('CPLT-A1', MECH, 6, 5, [1, 2, 2], 1, 4)
+    for battle in range(0,1000):
+        # Set attacker and defender stats here
+        # Format: 'Name', type (see constants at top), armor, structure, damage array, movement in inches, skill
+        attacker = CombatUnit('CPLT-C1', MECH, 5, 5, [2, 3, 2], 8, 4)
+        defender = CombatUnit('CPLT-A1', MECH, 6, 5, [1, 2, 2], 8, 4)
         winner = one_vs_one(attacker, defender, LONG_RANGE)
         wins[winner] += 1
     logging.info('====================')
