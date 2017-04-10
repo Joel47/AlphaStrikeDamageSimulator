@@ -3,7 +3,9 @@ import os
 import shutil
 import random
 
-# To set variables, scroll down to the bottom
+LOG_LEVEL = 30  # 10 = Debug, 20 = lots of info, 30 = just results
+LOG_FILE = 'c:/temp/as.txt'  # Set to '' to output to console; otherwise, path to log file
+SKILL_LEVEL = 4  # All units will be this skill unless directly set
 
 # Constants for use below
 SHORT_RANGE = 0
@@ -22,6 +24,24 @@ WHEELED = 2
 HOVER = 3
 VTOL = 4
 WIGE = 5
+
+# Units to compute
+# TODO - replace with import
+UNIT_LIST = []
+UNIT_LIST.append({'name':'Uziel UZL-3S', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[3, 3, 0], 'move':12, 'skill':4})
+UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'skill':4, 'motive':0, 'special':['ENE']})
+UNIT_LIST.append({'name':'Locust IIC 7', 'type':MECH, 'armor':3, 'structure':2, 'weapons':[3, 3, 0], 'move':16, 'skill':4, 'motive':0, 'special':['CASE']})
+UNIT_LIST.append({'name':'Initiate INI-02', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[4, 4, 1], 'move':8, 'skill':4, 'motive':0, 'special':['CASE']})
+UNIT_LIST.append({'name':'Thunder Fox TDF-F11', 'type':MECH, 'armor':7, 'structure':2, 'weapons':[2, 2, 2], 'move':10, 'skill':4, 'motive':0, 'special':['ENE']})
+UNIT_LIST.append({'name':'Catapult CPLT-C1', 'type':MECH, 'armor':5, 'structure':5, 'weapons':[2, 3, 2], 'move':8, 'skill':4})
+UNIT_LIST.append({'name':'Crusader CRD-3R', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 2], 'move':8, 'skill':4})
+UNIT_LIST.append({'name':'Warhammer WHM-6R', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[3, 3, 2], 'move':8, 'skill':4})
+UNIT_LIST.append({'name':'Fire Falcon H', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[5, 4, 0], 'move':16, 'skill':4, 'motive':0, 'special':['ENE']})
+UNIT_LIST.append({'name':'Gunsmith CH11-NG', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':26, 'skill':4, 'motive':0, 'special':['ENE']})
+UNIT_LIST.append({'name':'Anubis ABS-5Z', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':14, 'skill':4, 'motive':0, 'special':['ECM', 'TAG']})
+
+#  UNIT_LIST.append(['Wasp WSP-3A', MECH, 2, 1, [1, 1, 0], 10, 4, 0, ['ENE']])
+#  UNIT_LIST.append(['Dasher E', MECH, 1, 1, [2, 1, 1], 26, 4, 0, ['CASE']])
 
 class CombatUnit(object):
 
@@ -163,6 +183,51 @@ class CombatUnit(object):
             # TODO - implement crits
 
 
+def unit_create_from_dict(stat_dict):
+    #name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None
+    try:
+        unit_name = stat_dict['name']
+    except KeyError:
+        unit_name = 'No name'
+    try:
+        unit_type = stat_dict['type']
+    except KeyError:
+        unit_type = MECH
+    try:
+        unit_armor = stat_dict['armor']
+    except KeyError:
+        unit_armor = 0
+    try:
+        unit_structure = stat_dict['structure']
+    except KeyError:
+        unit_structure = 1
+    try:
+        unit_weapons = []
+        for range_band in [0, 1, 2]:
+            unit_weapons.append(stat_dict['weapons'][range_band])
+        # TODO - verify this is a list with 3 entries
+    except KeyError:
+        unit_weapons = [0, 0, 0]
+    try:
+        unit_move = stat_dict['move']
+    except KeyError:
+        unit_move = 0
+    try:
+        unit_skill = stat_dict['skill']
+    except KeyError:
+        unit_skill = SKILL_LEVEL
+    try:
+        unit_motive = stat_dict['motive']
+    except KeyError:
+        unit_motive = 0
+    try:
+        unit_special = stat_dict['special']
+    except KeyError:
+        unit_special = []
+    return CombatUnit(unit_name, unit_type, unit_armor, unit_structure, unit_weapons, unit_move, unit_skill,
+                      unit_motive, unit_special)
+
+
 def movement_mod(movement, jumped=False):
     if jumped:
         jump_mod = 1
@@ -192,7 +257,7 @@ def logging_configure(log_path='', log_level=10):
     if len(log_path) > 0:
         log_to_file = True
         output_log_file_directory = os.path.dirname(log_path) + '/'
-        output_log_file_name = os.path.splitext(os.path.basename(log_path))[0]
+        output_log_file_name = os.path.basename(log_path)
     else:
         # Log to screen
         log_to_file = False
@@ -212,17 +277,17 @@ def logging_configure(log_path='', log_level=10):
         except BaseException as why:
             raise IOError('Unable to create log folder: ' + str(why))
         # Check for existing log file and rename if it exists
-        if os.path.isfile(output_log_file_directory + output_log_file_name + '.log'):
+        if os.path.isfile(output_log_file_directory + output_log_file_name):
             file_increment = 1
-            while os.path.isfile(output_log_file_directory + output_log_file_name + '_' + str(file_increment) + '.log'):
+            while os.path.isfile(output_log_file_directory + output_log_file_name + '_' + str(file_increment)):
                 file_increment += 1
             try:
-                shutil.move(output_log_file_directory + output_log_file_name + '.log', output_log_file_directory +
-                            output_log_file_name + '_' + str(file_increment) + '.log')
+                shutil.move(output_log_file_directory + output_log_file_name, output_log_file_directory +
+                            output_log_file_name + '_' + str(file_increment))
             except BaseException as why:
                 raise RuntimeError('Unable to copy old output log.  Stopping so as not to overwrite data. '
                                    + str(why))
-        logging.basicConfig(filename=output_log_file_directory + output_log_file_name + '.log', level=log_level,
+        logging.basicConfig(filename=output_log_file_directory + output_log_file_name, level=log_level,
                             format=log_format)
     else:
         logging.basicConfig(level=log_level, format=log_format)
@@ -273,18 +338,26 @@ def one_vs_one(attacker, defender, range_band):
 
 
 if __name__ == "__main__":
-    # Set the second field to 10 to see everything, 20 to see some, and 30 to just see results
-    logging_configure('', 30)
+    logging_configure(LOG_FILE, LOG_LEVEL)
     random.seed()
-    wins = [0,0,0]
-    for battle in range(0,1000):
-        # Set attacker and defender stats here
-        # Format: 'Name', type (see constants at top), armor, structure, damage array, movement in inches, skill
-        attacker = CombatUnit('CPLT-C1', MECH, 5, 5, [2, 3, 2], 8, 4)
-        defender = CombatUnit('CPLT-A1', MECH, 6, 5, [1, 2, 2], 8, 4)
-        winner = one_vs_one(attacker, defender, LONG_RANGE)
-        wins[winner] += 1
-    logging.info('====================')
-    logging.critical('Attacker: ' + str(wins[1]))
-    logging.critical('Defender: ' + str(wins[2]))
-    logging.critical('Ties: ' + str(wins[0]))
+    defender_list = []
+    for attacker in UNIT_LIST:
+        defender_list.append(attacker)
+    for attacker in UNIT_LIST:
+        for defender in defender_list:
+            if attacker['name'] == defender['name']:
+                logging.debug('Identical units; skipping.')
+                continue
+            wins = [0,0,0]  # Ties, Attacker, Defender
+            for battle in range(0,1000):
+                # Set attacker and defender stats here
+                # Format: 'Name', type (see constants at top), armor, structure, damage array, movement in inches, skill
+                attacking_unit = unit_create_from_dict(attacker)
+                defending_unit = unit_create_from_dict(defender)
+                winner = one_vs_one(attacking_unit, defending_unit, MEDIUM_RANGE)
+                wins[winner] += 1
+            logging.critical('====================')
+            logging.critical(attacker['name'] + ': ' + str(wins[1]))
+            logging.critical(defender['name'] + ': ' + str(wins[2]))
+            logging.critical('Ties: ' + str(wins[0]))
+
