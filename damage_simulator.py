@@ -3,14 +3,17 @@ import os
 import shutil
 import random
 
-LOG_LEVEL = 30  # 10 = Debug, 20 = lots of info, 30 = just results
-LOG_FILE = 'c:/temp/as.txt'  # Set to '' to output to console; otherwise, path to log file
+LOG_LEVEL = 10  # 10 = Debug, 20 = lots of info, 30 = just results
+LOG_FILE = ''  # Set to '' to output to console; otherwise, path to log file
+BATTLE_RUNS = 1  # Number of battles per pairing to simulate
+
 SKILL_LEVEL = 4  # All units will be this skill unless directly set
 
 # Constants for use below
 SHORT_RANGE = 0
 MEDIUM_RANGE = 1
 LONG_RANGE = 2
+RANDOM_RANGE = -1
 
 MECH = 0
 VEHICLE = 1
@@ -28,20 +31,24 @@ WIGE = 5
 # Units to compute
 # TODO - replace with import
 UNIT_LIST = []
-UNIT_LIST.append({'name':'Uziel UZL-3S', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[3, 3, 0], 'move':12, 'skill':4})
-UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'skill':4, 'motive':0, 'special':['ENE']})
-UNIT_LIST.append({'name':'Locust IIC 7', 'type':MECH, 'armor':3, 'structure':2, 'weapons':[3, 3, 0], 'move':16, 'skill':4, 'motive':0, 'special':['CASE']})
-UNIT_LIST.append({'name':'Initiate INI-02', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[4, 4, 1], 'move':8, 'skill':4, 'motive':0, 'special':['CASE']})
-UNIT_LIST.append({'name':'Thunder Fox TDF-F11', 'type':MECH, 'armor':7, 'structure':2, 'weapons':[2, 2, 2], 'move':10, 'skill':4, 'motive':0, 'special':['ENE']})
-UNIT_LIST.append({'name':'Catapult CPLT-C1', 'type':MECH, 'armor':5, 'structure':5, 'weapons':[2, 3, 2], 'move':8, 'skill':4})
-UNIT_LIST.append({'name':'Crusader CRD-3R', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 2], 'move':8, 'skill':4})
-UNIT_LIST.append({'name':'Warhammer WHM-6R', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[3, 3, 2], 'move':8, 'skill':4})
-UNIT_LIST.append({'name':'Fire Falcon H', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[5, 4, 0], 'move':16, 'skill':4, 'motive':0, 'special':['ENE']})
-UNIT_LIST.append({'name':'Gunsmith CH11-NG', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':26, 'skill':4, 'motive':0, 'special':['ENE']})
-UNIT_LIST.append({'name':'Anubis ABS-5Z', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':14, 'skill':4, 'motive':0, 'special':['ECM', 'TAG']})
+UNIT_LIST.append({'name':'Uziel UZL-3S', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[3, 3, 0], 'move':12})
+# UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'special':['ENE']})
+# UNIT_LIST.append({'name':'Locust IIC 7', 'type':MECH, 'armor':3, 'structure':2, 'weapons':[3, 3, 0], 'move':16, 'special':['CASE']})
+# UNIT_LIST.append({'name':'Initiate INI-02', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[4, 4, 1], 'move':8, 'special':['CASE', 'AMS']})
+# UNIT_LIST.append({'name':'Thunder Fox TDF-F11', 'type':MECH, 'armor':7, 'structure':2, 'weapons':[2, 2, 2], 'move':10, 'special':['ENE', 'CR']})
+# UNIT_LIST.append({'name':'Catapult CPLT-C1', 'type':MECH, 'armor':5, 'structure':5, 'weapons':[2, 3, 2], 'move':8})
+# UNIT_LIST.append({'name':'Crusader CRD-3R', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 2], 'move':8})
+# UNIT_LIST.append({'name':'Warhammer WHM-6R', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[3, 3, 2], 'move':8})
+# UNIT_LIST.append({'name':'Fire Falcon H', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[5, 4, 0], 'move':16, 'special':['ENE']})
+# UNIT_LIST.append({'name':'Gunsmith CH11-NG', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':26, 'special':['ENE', 'RFA']})
+UNIT_LIST.append({'name':'Anubis ABS-5Z', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':14, 'special':['ECM', 'TAG', 'STL']})
 
 #  UNIT_LIST.append(['Wasp WSP-3A', MECH, 2, 1, [1, 1, 0], 10, 4, 0, ['ENE']])
 #  UNIT_LIST.append(['Dasher E', MECH, 1, 1, [2, 1, 1], 26, 4, 0, ['CASE']])
+
+# TODO - add handling for the following specials:
+# TODO - CR (critical resistant - -2 to crit rolls)
+# TODO - RFA (reduce damage from ENE by half)
 
 class CombatUnit(object):
 
@@ -68,10 +75,11 @@ class CombatUnit(object):
             logging.debug(str(damage) + ' applied to armor; ' + str(self.armor) + ' armor remaining.')
         else:
             if self.armor > 0:
+                # Don't want to see this message unless there was armor before the hit.
                 logging.debug('Armor destroyed.')
             damage -= self.armor
             self.armor = 0
-            if damage <= self.structure:
+            if damage < self.structure:
                 self.structure -= damage
                 logging.debug(str(damage) + ' applied to structure; ' + str(self.structure) + ' structure remaining.')
                 self.apply_crit(two_d6())
@@ -311,31 +319,56 @@ def roll_to_hit(skill, range_mod, def_mod, terrain=0):
 
 
 def one_vs_one(attacker, defender, range_band):
-    round_count = 1
+    round_count = 0
     while attacker.structure > 0 and defender.structure > 0:
+        round_count += 1
         logging.info('========== ROUND ' + str(round_count) + ' ==========')
-        # TODO - if movement_mod == 0, decrease skill by 1 to simulate standing still
+        if range_band not in [SHORT_RANGE, MEDIUM_RANGE, LONG_RANGE]:
+            # Start at Long, then random short & medium
+            if round_count == 1:
+                current_range_band = LONG_RANGE
+                range_mod = 4
+                logging.debug('First round: long range')
+            else:
+                current_range_band = random.randint(0,1)
+                range_mod = 2 * current_range_band
+                logging.debug('Later round; range mod ' + str(range_mod))
+        else:
+            # Fixed range
+            range_mod = 2 * range_band
+            current_range_band = range_band
+        if attacker.movement_mod == 0:
+            attacker_mods = -1
+        else:
+            attacker_mods = 0
+        if defender.movement_mod == 0:
+            defender_mods = -1
+        else:
+            defender_mods = 0
+        if 'STL' in attacker.special:
+            defender_mods += int(float(range_mod) / 2)
+        if 'STL' in defender.special:
+            attacker_mods += int(float(range_mod) / 2)
         logging.debug(attacker.name + ' attacks ' + defender.name)
-        defender_was_hit = roll_to_hit(attacker.skill, range_band * 2, defender.movement_mod)
+        defender_was_hit = roll_to_hit(attacker.skill + attacker_mods, range_mod, defender.movement_mod)
         logging.debug(defender.name + ' attacks ' + attacker.name)
-        attacker_was_hit = roll_to_hit(defender.skill, range_band * 2, attacker.movement_mod)
+        attacker_was_hit = roll_to_hit(defender.skill + defender_mods, range_mod, attacker.movement_mod)
         if attacker_was_hit:
             attacker.motive_check()
-            attacker.apply_damage(defender.weapons[range_band])
+            attacker.apply_damage(defender.weapons[current_range_band])
         if defender_was_hit:
             defender.motive_check()
-            defender.apply_damage(attacker.weapons[range_band])
-        round_count += 1
+            defender.apply_damage(attacker.weapons[current_range_band])
     if attacker.structure > defender.structure:
         logging.info('Winner: ' + attacker.name)
-        return 1
+        winner = 1
     elif defender.structure > attacker.structure:
         logging.info('Winner: ' + defender.name)
-        return 2
+        winner = 2
     else:
         logging.info('Draw.')
-        return 0
-
+        winner = 0
+    return {'winner': winner, 'rounds': round_count}
 
 if __name__ == "__main__":
     logging_configure(LOG_FILE, LOG_LEVEL)
@@ -349,15 +382,18 @@ if __name__ == "__main__":
                 logging.debug('Identical units; skipping.')
                 continue
             wins = [0,0,0]  # Ties, Attacker, Defender
-            for battle in range(0,1000):
+            rounds = 0
+            for battle in range(0, BATTLE_RUNS):
                 # Set attacker and defender stats here
                 # Format: 'Name', type (see constants at top), armor, structure, damage array, movement in inches, skill
                 attacking_unit = unit_create_from_dict(attacker)
                 defending_unit = unit_create_from_dict(defender)
-                winner = one_vs_one(attacking_unit, defending_unit, MEDIUM_RANGE)
-                wins[winner] += 1
+                result_dict = one_vs_one(attacking_unit, defending_unit, RANDOM_RANGE)
+                wins[result_dict['winner']] += 1
+                rounds += result_dict['rounds']
             logging.critical('====================')
             logging.critical(attacker['name'] + ': ' + str(wins[1]))
             logging.critical(defender['name'] + ': ' + str(wins[2]))
             logging.critical('Ties: ' + str(wins[0]))
+            logging.critical('Average battle length: ' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))))
 
