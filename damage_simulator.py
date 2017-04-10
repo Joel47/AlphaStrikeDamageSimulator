@@ -3,13 +3,16 @@ import os
 import shutil
 import random
 
-LOG_LEVEL = 10  # 10 = Debug, 20 = lots of info, 30 = just results
+LOG_LEVEL = 30  # 10 = Debug, 20 = lots of info, 30 = just results
 LOG_FILE = ''  # Set to '' to output to console; otherwise, path to log file
-BATTLE_RUNS = 1  # Number of battles per pairing to simulate
+BATTLE_RUNS = 1000  # Number of battles per pairing to simulate
+OUTPUT_AS_BBCODE = True  # if True, requires LOG_LEVEL = 30
 
 SKILL_LEVEL = 4  # All units will be this skill unless directly set
 
 # Constants for use below
+MAX_ROUNDS = 100  # Avoid runaways
+
 SHORT_RANGE = 0
 MEDIUM_RANGE = 1
 LONG_RANGE = 2
@@ -32,23 +35,20 @@ WIGE = 5
 # TODO - replace with import
 UNIT_LIST = []
 UNIT_LIST.append({'name':'Uziel UZL-3S', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[3, 3, 0], 'move':12})
-# UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Locust IIC 7', 'type':MECH, 'armor':3, 'structure':2, 'weapons':[3, 3, 0], 'move':16, 'special':['CASE']})
-# UNIT_LIST.append({'name':'Initiate INI-02', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[4, 4, 1], 'move':8, 'special':['CASE', 'AMS']})
-# UNIT_LIST.append({'name':'Thunder Fox TDF-F11', 'type':MECH, 'armor':7, 'structure':2, 'weapons':[2, 2, 2], 'move':10, 'special':['ENE', 'CR']})
-# UNIT_LIST.append({'name':'Catapult CPLT-C1', 'type':MECH, 'armor':5, 'structure':5, 'weapons':[2, 3, 2], 'move':8})
-# UNIT_LIST.append({'name':'Crusader CRD-3R', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 2], 'move':8})
-# UNIT_LIST.append({'name':'Warhammer WHM-6R', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[3, 3, 2], 'move':8})
-# UNIT_LIST.append({'name':'Fire Falcon H', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[5, 4, 0], 'move':16, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Gunsmith CH11-NG', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':26, 'special':['ENE', 'RFA']})
+UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'special':['ENE']})
+UNIT_LIST.append({'name':'Locust IIC 7', 'type':MECH, 'armor':3, 'structure':2, 'weapons':[3, 3, 0], 'move':16, 'special':['CASE']})
+UNIT_LIST.append({'name':'Initiate INI-02', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[4, 4, 1], 'move':8, 'special':['CASE', 'AMS']})
+UNIT_LIST.append({'name':'Thunder Fox TDF-F11', 'type':MECH, 'armor':7, 'structure':2, 'weapons':[2, 2, 2], 'move':10, 'special':['ENE', 'CR']})
+UNIT_LIST.append({'name':'Catapult CPLT-C1', 'type':MECH, 'armor':5, 'structure':5, 'weapons':[2, 3, 2], 'move':8})
+UNIT_LIST.append({'name':'Crusader CRD-3R', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 2], 'move':8})
+UNIT_LIST.append({'name':'Warhammer WHM-6R', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[3, 3, 2], 'move':8})
+UNIT_LIST.append({'name':'Fire Falcon H', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[5, 4, 0], 'move':16, 'special':['ENE']})
+UNIT_LIST.append({'name':'Gunsmith CH11-NG', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':26, 'special':['ENE', 'RFA']})
 UNIT_LIST.append({'name':'Anubis ABS-5Z', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':14, 'special':['ECM', 'TAG', 'STL']})
 
 #  UNIT_LIST.append(['Wasp WSP-3A', MECH, 2, 1, [1, 1, 0], 10, 4, 0, ['ENE']])
 #  UNIT_LIST.append(['Dasher E', MECH, 1, 1, [2, 1, 1], 26, 4, 0, ['CASE']])
 
-# TODO - add handling for the following specials:
-# TODO - CR (critical resistant - -2 to crit rolls)
-# TODO - RFA (reduce damage from ENE by half)
 
 class CombatUnit(object):
 
@@ -68,8 +68,12 @@ class CombatUnit(object):
             self.special = []
         self.crits = []
 
-    def apply_damage(self, damage):
+    def apply_damage(self, damage, attacker_specials=''):
         logging.debug('Applying ' + str(damage) + ' damage to ' + self.name)
+        if 'RFA' in self.special:
+            if 'ENE' in attacker_specials:
+                logging.debug('Reflective Armor reduces damage by half.')
+                damage = divide_by_two_round_up(damage)
         if damage <= self.armor:
             self.armor -= damage
             logging.debug(str(damage) + ' applied to armor; ' + str(self.armor) + ' armor remaining.')
@@ -103,8 +107,10 @@ class CombatUnit(object):
                 self.movement = 0
             self.movement_mod = movement_mod(self.movement)
 
-
     def apply_crit(self, crit_roll):
+        if 'CR' in self.special:
+            logging.debug('Critical Resistant: -2 to crit roll')
+            crit_roll -= 2
         if self.type == MECH:
             if crit_roll == 2:
                 logging.debug('Ammo Explosion!')
@@ -258,7 +264,7 @@ def movement_mod(movement, jumped=False):
 
 
 def divide_by_two_round_up(x):
-    return int(10 * ((x + 5) // 20))
+    return int(round(float(x)/2))
 
 
 def logging_configure(log_path='', log_level=10):
@@ -305,6 +311,18 @@ def two_d6():
     die1 = random.randint(1,6)
     die2 = random.randint(1,6)
     return die1 + die2
+
+
+def dice_test(times_to_roll):
+    dice_results = []
+    for roll in range(2, 13):
+        dice_results.append(0)
+    for roll in range(0, times_to_roll):
+        result = two_d6()
+        dice_results[result - 2] += 1
+    logging.critical('Dice results:')
+    for roll in range(2, 13):
+        logging.critical(str(roll) + ': ' + str(dice_results[roll - 2]))
 
 
 def roll_to_hit(skill, range_mod, def_mod, terrain=0):
@@ -355,10 +373,13 @@ def one_vs_one(attacker, defender, range_band):
         attacker_was_hit = roll_to_hit(defender.skill + defender_mods, range_mod, attacker.movement_mod)
         if attacker_was_hit:
             attacker.motive_check()
-            attacker.apply_damage(defender.weapons[current_range_band])
+            attacker.apply_damage(defender.weapons[current_range_band], defender.special)
         if defender_was_hit:
             defender.motive_check()
-            defender.apply_damage(attacker.weapons[current_range_band])
+            defender.apply_damage(attacker.weapons[current_range_band], attacker.special)
+        if round_count > MAX_ROUNDS:
+            logging.critical('Maximum rounds exceeded; calling the battle.')
+            break
     if attacker.structure > defender.structure:
         logging.info('Winner: ' + attacker.name)
         winner = 1
@@ -373,13 +394,31 @@ def one_vs_one(attacker, defender, range_band):
 if __name__ == "__main__":
     logging_configure(LOG_FILE, LOG_LEVEL)
     random.seed()
+    # dice_test(100000)
     defender_list = []
+    completed_attackers = []
+    if OUTPUT_AS_BBCODE:
+        logging.critical('[table][tr][td]Attacker \ Defender[/td]')
+    for defender in UNIT_LIST:
+        defender_list.append(defender)
+        if OUTPUT_AS_BBCODE:
+            logging.critical('[td]' + defender['name'] + '[/td]')
+    if OUTPUT_AS_BBCODE:
+        logging.critical('[/tr]')
     for attacker in UNIT_LIST:
-        defender_list.append(attacker)
-    for attacker in UNIT_LIST:
+        if OUTPUT_AS_BBCODE:
+            logging.critical('[tr][td]' + attacker['name'] + '[/td]')
         for defender in defender_list:
             if attacker['name'] == defender['name']:
                 logging.debug('Identical units; skipping.')
+                if OUTPUT_AS_BBCODE:
+                    logging.critical('[td]-----[/td]')
+                continue
+            if attacker['name'] in completed_attackers:
+                # TODO - this isn't working
+                logging.debug('Pairing already run; skipping.')
+                if OUTPUT_AS_BBCODE:
+                    logging.critical('[td]-----[/td]')
                 continue
             wins = [0,0,0]  # Ties, Attacker, Defender
             rounds = 0
@@ -391,9 +430,23 @@ if __name__ == "__main__":
                 result_dict = one_vs_one(attacking_unit, defending_unit, RANDOM_RANGE)
                 wins[result_dict['winner']] += 1
                 rounds += result_dict['rounds']
-            logging.critical('====================')
-            logging.critical(attacker['name'] + ': ' + str(wins[1]))
-            logging.critical(defender['name'] + ': ' + str(wins[2]))
-            logging.critical('Ties: ' + str(wins[0]))
-            logging.critical('Average battle length: ' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))))
-
+            if OUTPUT_AS_BBCODE:
+                if wins[1] > wins[2]:
+                    logging.critical('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) + '/' +
+                                     str(wins[0]) + '(' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))) +
+                                     ')[/td]')
+                elif wins[2] > wins[1]:
+                    logging.critical('[td]' + defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) + '/' +
+                                     str(wins[0]) + '(' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))) +
+                                     ')[/td]')
+            else:
+                logging.critical('====================')
+                logging.critical(attacker['name'] + ': ' + str(wins[1]))
+                logging.critical(defender['name'] + ': ' + str(wins[2]))
+                logging.critical('Ties: ' + str(wins[0]))
+                logging.critical('Average battle length: ' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))))
+        completed_attackers.append(attacker['name'])
+        if OUTPUT_AS_BBCODE:
+            logging.critical('[/tr]')
+    if OUTPUT_AS_BBCODE:
+        logging.critical('[/table]')
