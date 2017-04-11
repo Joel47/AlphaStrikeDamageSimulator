@@ -1,0 +1,8 @@
+[{"name":"Alacorn Tank", "type":1, "armor":7, "structure":5, "weapons":[4, 5, 5], "move":6, "motive": 0, "special":[]},
+{"name":"Hellion Prime", "type":0, "armor":4, "structure":2, "weapons":[4, 4, 1], "move":18, "special":["CASE"]},
+{"name":"Kintaro KTO-C", "type":0, "armor":6, "structure":5, "weapons":[4, 4, 0.5], "move":10, "special":[]},
+{"name":"Lament LMT-2R", "type":0, "armor":7, "structure":3, "weapons":[3, 4, 3], "move":10, "special":["ENE"]},
+{"name":"Prowler PWR-1X", "type":0, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":18, "special":["ENE"]},
+{"name":"Thug THG-10E", "type":0, "armor":8, "structure":6, "weapons":[3, 3, 2], "move":8, "special":[]},
+{"name":"Wulfen H", "type":0, "armor":3, "structure":1, "weapons":[3, 3, 0], "move":20, "special":["CASE","STL"]}
+  ]

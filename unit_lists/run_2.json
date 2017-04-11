@@ -1,0 +1,13 @@
+[
+  {"name":"Uziel UZL-3S", "type":0, "armor":4, "structure":2, "weapons":[3, 3, 0], "move":12},
+{"name":"Lynx LNX-8Q", "type":0, "armor":6, "structure":5, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+{"name":"Black Hawk (Nova, B", "type":0, "armor":5, "structure":3, "weapons":[3, 3, 2], "move":10, "motive":0, "special":["CASE"]},
+{"name":"Black Hawk-KU BHKU-OB", "type":0, "armor":7, "structure":3, "weapons":[2, 2, 1], "move":10, "motive":0},
+{"name":"Cataphract CTF-3D", "type":0, "armor":6, "structure":3, "weapons":[3, 3, 2], "move":8, "motive":0, "special":["CASE"]},
+{"name":"Catapult CPLT-H2", "type":0, "armor":6, "structure":5, "weapons":[3, 3, 1], "move":8, "motive":0},
+{"name":"Cicada CDA-3F", "type":0, "armor":4, "structure":2, "weapons":[2, 2, 1], "move":16, "motive":0, "special":["ENE"]},
+{"name":"Victor VTR-9A1", "type":0, "armor":5, "structure":6, "weapons":[4, 4, 0], "move":8, "motive":0},
+{"name":"Watchman WTC-4DM", "type":0, "armor":5, "structure":3, "weapons":[3, 3, 1], "move":10, "motive":0, "special":["ENE"]},
+{"name":"Wight WGT-2LAW", "type":0, "armor":3, "structure":4, "weapons":[2, 2, 1], "move":10, "motive":0, "special":["ENE"], "comment": "Move should be 14, but special rules"},
+{"name":"Wulfen C", "type":0, "armor":3, "structure":1, "weapons":[2, 2, 0], "move":20, "motive":0, "special":["ENE", "STL"]}
+  ]

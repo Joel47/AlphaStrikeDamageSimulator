@@ -1,0 +1,13 @@
+[
+  {"name":"Awesome Jeff X", "type":MECH, "armor":8, "structure":6, "weapons":[4, 4, 4], "move":6, "special":[]},
+{"name":"Banshee BNC-7S", "type":MECH, "armor":8, "structure":5, "weapons":[4, 4, 3], "move":8, "special":["CASE"]},
+{"name":"BattleMaster BLR-1D", "type":MECH, "armor":9, "structure":7, "weapons":[4, 3, 1], "move":8, "special":[]},
+{"name":"Crimson Langur C", "type":MECH, "armor":6, "structure":3, "weapons":[4, 2, 2], "move":14, "special":["CASE"]},
+{"name":"Goshawk II 3", "type":MECH, "armor":5, "structure":2, "weapons":[3, 3, 2], "move":14, "special":["ENE"]},
+{"name":"Griffin GRF-5K", "type":MECH, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":10, "special":["CASE"]},
+{"name":"Highlander HGN-734", "type":MECH, "armor":9, "structure":5, "weapons":[4, 4, 1], "move":6, "special":["CASE"]},
+{"name":"Loki (Hellbringer) G", "type":MECH, "armor":4, "structure":4, "weapons":[5, 6, 3], "move":10, "special":["CASE"]},
+{"name":"Prowler PWR-1X", "type":MECH, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":18, "special":["ENE"]},
+{"name":"Shootist ST-8C", "type":MECH, "armor":7, "structure":6, "weapons":[4, 4, 1], "move":8, "special":["CASE"]},
+{"name":"Griffin GRF-5K Jump", "type":MECH, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":20, "skill": 6, "special":["CASE"]}
+  ]

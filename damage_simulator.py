@@ -3,14 +3,16 @@ import os
 import shutil
 import random
 import csv
+import json
 
 LOG_LEVEL = 30  # 10 = Debug, 20 = lots of info, 30 = just results
 LOG_FILE = ''  # Set to '' to output to console; otherwise, path to log file
 BATTLE_RUNS = 10000  # Number of battles per pairing to simulate
 OUTPUT_AS_BBCODE = False  # if True, requires LOG_LEVEL = 30
 CSV_FILEPATH = 'c:/temp/as.csv'  # Set to '' to disable CSV writing
+UNIT_LIST_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unit_lists', 'run_4.2.json')
 
-SKILL_LEVEL = 4  # All units will be this skill unless directly set
+DEFAULT_SKILL_LEVEL = 4  # All units will be this skill unless directly set
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -20,78 +22,20 @@ MEDIUM_RANGE = 1
 LONG_RANGE = 2
 RANDOM_RANGE = -1
 
+# Unit types
 MECH = 0
 VEHICLE = 1
 PROTOMECH = 2
 INFANTRY = 3
 BATTLEARMOR = 4
 
+# Motive types
 TRACKED = 0
 NAVAL = 1
 WHEELED = 2
 HOVER = 3
 VTOL = 4
 WIGE = 5
-
-# Units to compute
-# TODO - replace with import
-UNIT_LIST = []
-# Run 1
-# UNIT_LIST.append({'name':'Uziel UZL-3S', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[3, 3, 0], 'move':12})
-# UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Locust IIC 7', 'type':MECH, 'armor':3, 'structure':2, 'weapons':[3, 3, 0], 'move':16, 'special':['CASE']})
-# UNIT_LIST.append({'name':'Initiate INI-02', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[4, 4, 1], 'move':8, 'special':['CASE', 'AMS']})
-# UNIT_LIST.append({'name':'Thunder Fox TDF-F11', 'type':MECH, 'armor':7, 'structure':2, 'weapons':[2, 2, 2], 'move':10, 'special':['ENE', 'CR']})
-# UNIT_LIST.append({'name':'Catapult CPLT-C1', 'type':MECH, 'armor':5, 'structure':5, 'weapons':[2, 3, 2], 'move':8})
-# UNIT_LIST.append({'name':'Crusader CRD-3R', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 2], 'move':8})
-# UNIT_LIST.append({'name':'Warhammer WHM-6R', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[3, 3, 2], 'move':8})
-# UNIT_LIST.append({'name':'Fire Falcon H', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[5, 4, 0], 'move':16, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Gunsmith CH11-NG', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':26, 'special':['ENE', 'RFA']})
-# UNIT_LIST.append({'name':'Anubis ABS-5Z', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[3, 3, 0], 'move':14, 'special':['ECM', 'TAG', 'STL']})
-
-# Run 2
-# UNIT_LIST.append({'name':'Uziel UZL-3S', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[3, 3, 0], 'move':12})
-# UNIT_LIST.append({'name':'Lynx LNX-8Q', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[2, 2, 0], 'move':10, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Black Hawk (Nova) B', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'Black Hawk-KU BHKU-OB', 'type':MECH, 'armor':7, 'structure':3, 'weapons':[2, 2, 1], 'move':10, 'skill':4, 'motive':0})
-# UNIT_LIST.append({'name':'Cataphract CTF-3D', 'type':MECH, 'armor':6, 'structure':3, 'weapons':[3, 3, 2], 'move':8, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'Catapult CPLT-H2', 'type':MECH, 'armor':6, 'structure':5, 'weapons':[3, 3, 1], 'move':8, 'skill':4, 'motive':0})
-# UNIT_LIST.append({'name':'Cicada CDA-3F', 'type':MECH, 'armor':4, 'structure':2, 'weapons':[2, 2, 1], 'move':16, 'skill':4, 'motive':0, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Victor VTR-9A1', 'type':MECH, 'armor':5, 'structure':6, 'weapons':[4, 4, 0], 'move':8, 'skill':4, 'motive':0})
-# UNIT_LIST.append({'name':'Watchman WTC-4DM', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 1], 'move':10, 'skill':4, 'motive':0, 'special':['ENE']})
-# UNIT_LIST.append({'name':'Wight WGT-2LAW', 'type':MECH, 'armor':3, 'structure':4, 'weapons':[2, 2, 1], 'move':10, 'skill':4, 'motive':0, 'special':['ENE']})  # Move should be 14, but special rules
-# UNIT_LIST.append({'name':'Wulfen C', 'type':MECH, 'armor':3, 'structure':1, 'weapons':[2, 2, 0], 'move':20, 'skill':4, 'motive':0, 'special':['ENE', 'STL']})
-
-# Run 3
-UNIT_LIST.append({'name':'Awesome Jeff X', 'type':MECH, 'armor':8, 'structure':6, 'weapons':[4, 4, 4], 'move':6, 'special':[]})
-UNIT_LIST.append({'name':'Banshee BNC-7S', 'type':MECH, 'armor':8, 'structure':5, 'weapons':[4, 4, 3], 'move':8, 'special':['CASE']})
-UNIT_LIST.append({'name':'BattleMaster BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-UNIT_LIST.append({'name':'Crimson Langur C', 'type':MECH, 'armor':6, 'structure':3, 'weapons':[4, 2, 2], 'move':14, 'special':['CASE']})
-UNIT_LIST.append({'name':'Goshawk II 3', 'type':MECH, 'armor':5, 'structure':2, 'weapons':[3, 3, 2], 'move':14, 'special':['ENE']})
-UNIT_LIST.append({'name':'Griffin GRF-5K', 'type':MECH, 'armor':6, 'structure':3, 'weapons':[2, 2, 2], 'move':10, 'special':['CASE']})
-UNIT_LIST.append({'name':'Highlander HGN-734', 'type':MECH, 'armor':9, 'structure':5, 'weapons':[4, 4, 1], 'move':6, 'special':['CASE']})
-UNIT_LIST.append({'name':'Loki (Hellbringer) G', 'type':MECH, 'armor':4, 'structure':4, 'weapons':[5, 6, 3], 'move':10, 'special':['CASE']})
-UNIT_LIST.append({'name':'Prowler PWR-1X', 'type':MECH, 'armor':6, 'structure':3, 'weapons':[2, 2, 2], 'move':18, 'special':['ENE']})
-UNIT_LIST.append({'name':'Shootist ST-8C', 'type':MECH, 'armor':7, 'structure':6, 'weapons':[4, 4, 1], 'move':8, 'special':['CASE']})
-
-#  UNIT_LIST.append(['Wasp WSP-3A', MECH, 2, 1, [1, 1, 0], 10, 4, 0, ['ENE']])
-#  UNIT_LIST.append(['Dasher E', MECH, 1, 1, [2, 1, 1], 26, 4, 0, ['CASE']])
-
-# Self-test
-# UNIT_LIST.append({'name':'A', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'B', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'C', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'D', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'E', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'F', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'G', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
-# UNIT_LIST.append({'name':'A BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-# UNIT_LIST.append({'name':'B BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-# UNIT_LIST.append({'name':'C BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-# UNIT_LIST.append({'name':'D BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-# UNIT_LIST.append({'name':'E BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-# UNIT_LIST.append({'name':'F BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
-# UNIT_LIST.append({'name':'G BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
 
 
 class CombatUnit(object):
@@ -144,11 +88,16 @@ class CombatUnit(object):
                 motive_roll += 2
             if motive_roll == 9 or motive_roll == 10:
                 self.movement = min(0, self.movement - 2)
+                logging.info(self.name + ' Motive hit: movement reduced to ' + str(self.movement))
             elif motive_roll == 11:
                 movement_loss = divide_by_two_round_up(self.movement)
                 self.movement -= movement_loss
+                logging.info(self.name + 'Motive hit: movement reduced to ' + str(self.movement))
             elif motive_roll == 12:
                 self.movement = 0
+                logging.info(self.name + 'Motive hit: movement reduced to 0')
+            else:
+                logging.debug('Motive hit: No effect.')
             self.movement_mod = movement_mod(self.movement)
 
     def apply_crit(self, crit_roll):
@@ -277,7 +226,7 @@ def unit_create_from_dict(stat_dict):
     try:
         unit_skill = stat_dict['skill']
     except KeyError:
-        unit_skill = SKILL_LEVEL
+        unit_skill = DEFAULT_SKILL_LEVEL
     try:
         unit_motive = stat_dict['motive']
     except KeyError:
@@ -289,6 +238,13 @@ def unit_create_from_dict(stat_dict):
     return CombatUnit(unit_name, unit_type, unit_armor, unit_structure, unit_weapons, unit_move, unit_skill,
                       unit_motive, unit_special)
 
+
+def unit_list_read_from_json(json_path):
+    with open(json_path) as json_data:
+        units = json.load(json_data)
+    logging.debug('Read unit list ' + json_path + ':')
+    logging.debug(str(units))
+    return units
 
 def movement_mod(movement, jumped=False):
     if jumped:
@@ -462,6 +418,7 @@ def one_vs_one(attacker, defender, range_band):
 
 if __name__ == "__main__":
     logging_configure(LOG_FILE, LOG_LEVEL)
+    unit_list = unit_list_read_from_json(UNIT_LIST_PATH)
     random.seed()
     # dice_test(100000)
     attacker_roll_total = 0
@@ -483,7 +440,7 @@ if __name__ == "__main__":
         logging.critical('[table][tr][td]Attacker \ Defender[/td]')
     if csv_write:
         csv_fields = ['Attacker']
-    for defender in UNIT_LIST:
+    for defender in unit_list:
         defender_list.append(defender)
         if OUTPUT_AS_BBCODE:
             logging.critical('[td]' + defender['name'] + '[/td]')
@@ -495,7 +452,7 @@ if __name__ == "__main__":
         csv_writer = csv.DictWriter(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
                                     fieldnames=csv_fields)
         csv_writer.writeheader()
-    for attacker in UNIT_LIST:
+    for attacker in unit_list:
         if OUTPUT_AS_BBCODE:
             logging.critical('[tr][td]' + attacker['name'] + '[/td]')
         if csv_write:

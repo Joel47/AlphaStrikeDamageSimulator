@@ -1,0 +1,13 @@
+[
+{"name":"Uziel UZL-3S", "type":0, "armor":4, "structure":2, "weapons":[3, 3, 0], "move":12},
+{"name":"Lynx LNX-8Q", "type":0, "armor":6, "structure":5, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+{"name":"Locust IIC 7", "type":0, "armor":3, "structure":2, "weapons":[3, 3, 0], "move":16, "special":["CASE"]},
+{"name":"Initiate INI-02", "type":0, "armor":5, "structure":3, "weapons":[4, 4, 1], "move":8, "special":["CASE", "AMS"]},
+{"name":"Thunder Fox TDF-F11", "type":0, "armor":7, "structure":2, "weapons":[2, 2, 2], "move":10, "special":["ENE", "CR"]},
+{"name":"Catapult CPLT-C1", "type":0, "armor":5, "structure":5, "weapons":[2, 3, 2], "move":8},
+{"name":"Crusader CRD-3R", "type":0, "armor":6, "structure":5, "weapons":[2, 2, 2], "move":8},
+{"name":"Warhammer WHM-6R", "type":0, "armor":5, "structure":6, "weapons":[3, 3, 2], "move":8},
+{"name":"Fire Falcon H", "type":0, "armor":3, "structure":1, "weapons":[5, 4, 0], "move":16, "special":["ENE"]},
+{"name":"Gunsmith CH11-NG", "type":0, "armor":3, "structure":1, "weapons":[3, 3, 0], "move":26, "special":["ENE", "RFA"]},
+{"name":"Anubis ABS-5Z", "type":0, "armor":3, "structure":1, "weapons":[3, 3, 0], "move":14, "special":["ECM", "TAG", "STL"]}
+  ]

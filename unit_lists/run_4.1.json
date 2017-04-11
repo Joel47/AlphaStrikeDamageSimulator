@@ -1,0 +1,8 @@
+[{"name":"Cicada CDA-3F", "type":MECH, "armor":4, "structure":2, "weapons":[2, 2, 1], "move":16, "special":["ENE"]},
+{"name":"Crab CRB-C", "type":MECH, "armor":5, "structure":4, "weapons":[2, 2, 4], "move":10, "special":["ENE"]},
+{"name":"Fire Falcon F", "type":MECH, "armor":3, "structure":1, "weapons":[4, 2, 1], "move":16, "special":["CASE"]},
+{"name":"Hunchback HBK-6N", "type":MECH, "armor":5, "structure":4, "weapons":[4, 3, 0], "move":8, "special":["CASE"]},
+{"name":"Phantom H", "type":MECH, "armor":4, "structure":2, "weapons":[5, 1, 0], "move":18, "special":["ENE"]},
+{"name":"Quickdraw QKD-5A", "type":MECH, "armor":4, "structure":5, "weapons":[3, 3, 0], "move":10, "special":["ENE"]},
+{"name":"Wulfen B", "type":MECH, "armor":3, "structure":1, "weapons":[1, 1, 1], "move":20, "special":["ENE","STL"]}
+  ]

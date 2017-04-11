@@ -1,0 +1,8 @@
+[{"name":"BattleAxe BKX-1X", "type":0, "armor":5, "structure":6, "weapons":[3, 3, 1], "move":6, "special":[]},
+{"name":"Blitzkrieg BTZ-3F", "type":0, "armor":4, "structure":2, "weapons":[3, 3, 0], "move":14, "special":[]},
+{"name":"Cestus CTS-6X", "type":0, "armor":7, "structure":3, "weapons":[2, 2, 0], "move":8, "special":["ENE"]},
+{"name":"Griffin GRF-5K", "type":0, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":10, "special":["CASE"]},
+{"name":"JES III Missile Carrier", "type":1, "armor":4, "structure":3, "weapons":[3, 4, 4], "move":6, "motive": 3, "special":[]},
+{"name":"Puma A", "type":0, "armor":4, "structure":2, "weapons":[4, 4, 3], "move":12, "special":["CASE"]},
+{"name":"Scapha Hovertank J", "type":1, "armor":4, "structure":2, "weapons":[2, 2, 0], "move":22, "motive": 3, "special":["ENE"]}
+  ]
