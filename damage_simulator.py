@@ -6,7 +6,7 @@ import csv
 
 LOG_LEVEL = 30  # 10 = Debug, 20 = lots of info, 30 = just results
 LOG_FILE = ''  # Set to '' to output to console; otherwise, path to log file
-BATTLE_RUNS = 1000  # Number of battles per pairing to simulate
+BATTLE_RUNS = 10000  # Number of battles per pairing to simulate
 OUTPUT_AS_BBCODE = False  # if True, requires LOG_LEVEL = 30
 CSV_FILEPATH = 'c:/temp/as.csv'  # Set to '' to disable CSV writing
 
@@ -85,6 +85,13 @@ UNIT_LIST.append({'name':'Shootist ST-8C', 'type':MECH, 'armor':7, 'structure':6
 # UNIT_LIST.append({'name':'E', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
 # UNIT_LIST.append({'name':'F', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
 # UNIT_LIST.append({'name':'G', 'type':MECH, 'armor':5, 'structure':3, 'weapons':[3, 3, 2], 'move':10, 'skill':4, 'motive':0, 'special':['CASE']})
+# UNIT_LIST.append({'name':'A BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
+# UNIT_LIST.append({'name':'B BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
+# UNIT_LIST.append({'name':'C BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
+# UNIT_LIST.append({'name':'D BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
+# UNIT_LIST.append({'name':'E BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
+# UNIT_LIST.append({'name':'F BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
+# UNIT_LIST.append({'name':'G BLR-1D', 'type':MECH, 'armor':9, 'structure':7, 'weapons':[4, 3, 1], 'move':8, 'special':[]})
 
 
 class CombatUnit(object):
@@ -524,25 +531,25 @@ if __name__ == "__main__":
             if OUTPUT_AS_BBCODE:
                 if wins[1] > wins[2]:
                     logging.critical('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) + '/' +
-                                     str(wins[0]) + '(' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))) +
+                                     str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) +
                                      ')[/td]')
                 else:
                     logging.critical('[td]' + defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) + '/' +
-                                     str(wins[0]) + '(' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))) +
+                                     str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) +
                                      ')[/td]')
             else:
                 logging.critical('====================')
                 logging.critical(attacker['name'] + ': ' + str(wins[1]))
                 logging.critical(defender['name'] + ': ' + str(wins[2]))
                 logging.critical('Ties: ' + str(wins[0]))
-                logging.critical('Average battle length: ' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))))
+                logging.critical('Average battle length: ' + str(round(float(rounds) / float(BATTLE_RUNS), 1)))
             if csv_write:
                 if wins[1] > wins[2]:
-                    output_text = attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) + '/' + \
-                                  str(wins[0]) + '(' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))) + ')'
+                    output_text = attacker['name'] + ':' + str(wins[1]) + '/' + str(wins[2]) + '/' + \
+                                  str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) + ')'
                 else:
-                    output_text = defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) + '/' + \
-                                  str(wins[0]) + '(' + str(int(round(float(rounds) / float(BATTLE_RUNS), 0))) + ')'
+                    output_text = defender['name'] + ':' + str(wins[2]) + '/' + str(wins[1]) + '/' + \
+                                  str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) + ')'
                 csv_line[defender['name']] = output_text
 
 
