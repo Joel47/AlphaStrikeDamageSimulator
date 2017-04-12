@@ -14,6 +14,8 @@ UNIT_LIST_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unit
 
 DEFAULT_SKILL_LEVEL = 4  # All units will be this skill unless directly set
 
+# TODO - Consider moving the above into a config file to avoid confusion with the real code below.
+
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
 
@@ -40,9 +42,9 @@ WIGE = 5
 
 class CombatUnit(object):
 
-    def __init__(self, name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None):
+    def __init__(self, name, unit_type, armor, structure, weapons, movement, skill, motive_type=0, special=None):
         self.name = name
-        self.type = type
+        self.type = unit_type
         self.armor = armor
         self.structure = structure
         self.weapons = weapons
@@ -195,7 +197,7 @@ class CombatUnit(object):
 
 
 def unit_create_from_dict(stat_dict):
-    #name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None
+    # name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None
     try:
         unit_name = stat_dict['name']
     except KeyError:
@@ -246,6 +248,7 @@ def unit_list_read_from_json(json_path):
     logging.debug(str(units))
     return units
 
+
 def movement_mod(movement, jumped=False):
     if jumped:
         jump_mod = 1
@@ -292,8 +295,8 @@ def logging_configure(log_path='', log_level=10):
         try:
             if not os.path.isdir(output_log_file_directory):
                 os.makedirs(output_log_file_directory)
-        except BaseException as why:
-            raise IOError('Unable to create log folder: ' + str(why))
+        except BaseException as log_error:
+            raise IOError('Unable to create log folder: ' + str(log_error))
         # Check for existing log file and rename if it exists
         if os.path.isfile(output_log_file_directory + output_log_file_name):
             file_increment = 1
@@ -302,9 +305,9 @@ def logging_configure(log_path='', log_level=10):
             try:
                 shutil.move(output_log_file_directory + output_log_file_name, output_log_file_directory +
                             output_log_file_name + '_' + str(file_increment))
-            except BaseException as why:
+            except BaseException as log_error:
                 raise RuntimeError('Unable to copy old output log.  Stopping so as not to overwrite data. '
-                                   + str(why))
+                                   + str(log_error))
         logging.basicConfig(filename=output_log_file_directory + output_log_file_name, level=log_level,
                             format=log_format)
     else:
@@ -312,8 +315,8 @@ def logging_configure(log_path='', log_level=10):
 
 
 def two_d6():
-    die1 = random.randint(1,6)
-    die2 = random.randint(1,6)
+    die1 = random.randint(1, 6)
+    die2 = random.randint(1, 6)
     return die1 + die2
 
 
@@ -340,13 +343,13 @@ def roll_to_hit(skill, range_mod, def_mod, terrain=0):
         return False, die_roll
 
 
-def one_vs_one(attacker, defender, range_band):
+def one_vs_one(first_unit, second_unit, range_band):
     round_count = 0
-    attacker_roll_total = 0
-    attacker_rolls = 0
-    defender_roll_total = 0
-    defender_rolls = 0
-    while attacker.structure > 0 and defender.structure > 0:
+    battle_attacker_roll_total = 0
+    battle_attacker_rolls = 0
+    battle_defender_roll_total = 0
+    battle_defender_rolls = 0
+    while first_unit.structure > 0 and second_unit.structure > 0:
         round_count += 1
         logging.debug('========== ROUND ' + str(round_count) + ' ==========')
         if range_band not in [SHORT_RANGE, MEDIUM_RANGE, LONG_RANGE]:
@@ -356,65 +359,67 @@ def one_vs_one(attacker, defender, range_band):
                 range_mod = 4
                 logging.debug('First round: long range')
             else:
-                current_range_band = random.randint(0,1)
+                current_range_band = random.randint(0, 1)
                 range_mod = 2 * current_range_band
                 logging.debug('Later round; range mod ' + str(range_mod))
         else:
             # Fixed range
             range_mod = 2 * range_band
             current_range_band = range_band
-        if attacker.movement_mod == 0:
+        if first_unit.movement_mod == 0:
             attacker_mods = -1
         else:
             attacker_mods = 0
-        if defender.movement_mod == 0:
+        if second_unit.movement_mod == 0:
             defender_mods = -1
         else:
             defender_mods = 0
-        if 'STL' in attacker.special:
+        if 'STL' in first_unit.special:
             defender_mods += int(float(range_mod) / 2)
-        if 'STL' in defender.special:
+        if 'STL' in second_unit.special:
             attacker_mods += int(float(range_mod) / 2)
-        logging.debug(attacker.name + ' shoots ' + defender.name)
-        defender_was_hit, actual_roll = roll_to_hit(attacker.skill + attacker_mods, range_mod, defender.movement_mod)
-        attacker_roll_total += actual_roll
-        attacker_rolls += 1
-        logging.debug(defender.name + ' shoots ' + attacker.name)
-        attacker_was_hit, actual_roll = roll_to_hit(defender.skill + defender_mods, range_mod, attacker.movement_mod)
-        defender_roll_total += actual_roll
-        defender_rolls += 1
-        attacker_weapons = int(attacker.weapons[current_range_band])
-        defender_weapons = int(defender.weapons[current_range_band])
+        logging.debug(first_unit.name + ' shoots ' + second_unit.name)
+        defender_was_hit, actual_roll = roll_to_hit(first_unit.skill + attacker_mods, range_mod,
+                                                    second_unit.movement_mod)
+        battle_attacker_roll_total += actual_roll
+        battle_attacker_rolls += 1
+        logging.debug(second_unit.name + ' shoots ' + first_unit.name)
+        attacker_was_hit, actual_roll = roll_to_hit(second_unit.skill + defender_mods, range_mod,
+                                                    first_unit.movement_mod)
+        battle_defender_roll_total += actual_roll
+        battle_defender_rolls += 1
+        attacker_weapons = int(first_unit.weapons[current_range_band])
+        defender_weapons = int(second_unit.weapons[current_range_band])
         if attacker_was_hit:
-            attacker.motive_check()
-            attacker.apply_damage(defender_weapons, defender.special)
+            first_unit.motive_check()
+            first_unit.apply_damage(defender_weapons, second_unit.special)
         if defender_was_hit:
-            defender.motive_check()
-            defender.apply_damage(attacker_weapons, attacker.special)
-        attacker.state_log()
-        defender.state_log()
+            second_unit.motive_check()
+            second_unit.apply_damage(attacker_weapons, first_unit.special)
+        first_unit.state_log()
+        second_unit.state_log()
         if round_count > MAX_ROUNDS:
             logging.info('Maximum rounds exceeded; calling the battle.')
             break
-    if attacker.structure > 0 and defender.structure > 0:
+    if first_unit.structure > 0 and second_unit.structure > 0:
         logging.info('Draw.')
         logging.info('Both units survived.')
         winner = 0
-    elif attacker.structure <= 0 and defender.structure <= 0:
+    elif first_unit.structure <= 0 and second_unit.structure <= 0:
         logging.info('Draw.')
         winner = 0
-    elif defender.structure > 0:
-        logging.info('Winner: ' + defender.name)
+    elif second_unit.structure > 0:
+        logging.info('Winner: ' + second_unit.name)
         winner = 2
-    elif attacker.structure > 0:
-        logging.info('Winner: ' + attacker.name)
+    elif first_unit.structure > 0:
+        logging.info('Winner: ' + first_unit.name)
         winner = 1
     else:
         logging.error('Unsupported game end state.')
         winner = 0
     return {'winner': winner, 'rounds': round_count,
-            'attacker_roll_total': attacker_roll_total, 'attacker_rolls': attacker_rolls,
-            'defender_roll_total': defender_roll_total, 'defender_rolls': defender_rolls}
+            'attacker_roll_total': battle_attacker_roll_total, 'attacker_rolls': battle_attacker_rolls,
+            'defender_roll_total': battle_defender_roll_total, 'defender_rolls': battle_defender_rolls}
 
 if __name__ == "__main__":
     logging_configure(LOG_FILE, LOG_LEVEL)
@@ -473,7 +478,7 @@ if __name__ == "__main__":
                 if csv_write:
                     csv_line[defender['name']] = 'N/A'
                 continue
-            wins = [0,0,0]  # Ties, Attacker, Defender
+            wins = [0, 0, 0]  # Ties, Attacker, Defender
             rounds = 0
             for battle in range(0, BATTLE_RUNS):
                 attacking_unit = unit_create_from_dict(attacker)
@@ -508,8 +513,6 @@ if __name__ == "__main__":
                     output_text = defender['name'] + ':' + str(wins[2]) + '/' + str(wins[1]) + '/' + \
                                   str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) + ')'
                 csv_line[defender['name']] = output_text
-
-
         completed_attackers.append(attacker['name'])
         if OUTPUT_AS_BBCODE:
             logging.critical('[/tr]')
