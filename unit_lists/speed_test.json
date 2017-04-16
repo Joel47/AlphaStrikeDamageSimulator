@@ -1,0 +1,4 @@
+[
+{"name":"Locust IIC 7", "type":0, "armor":3, "structure":2, "weapons":[3, 3, 0], "move":16, "special":["CASE"]},
+{"name":"Catapult CPLT-C1", "type":0, "armor":5, "structure":5, "weapons":[2, 3, 2], "move":8}
+  ]

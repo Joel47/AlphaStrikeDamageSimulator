@@ -4,17 +4,9 @@ import shutil
 import random
 import csv
 import json
+import ConfigParser
 
-LOG_LEVEL = 30  # 10 = Debug, 20 = lots of info, 30 = just results
-LOG_FILE = ''  # Set to '' to output to console; otherwise, path to log file
-BATTLE_RUNS = 10000  # Number of battles per pairing to simulate
-OUTPUT_AS_BBCODE = False  # if True, requires LOG_LEVEL = 30
-CSV_FILEPATH = 'c:/temp/as.csv'  # Set to '' to disable CSV writing
-UNIT_LIST_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unit_lists', 'run_4.2.json')
-
-DEFAULT_SKILL_LEVEL = 4  # All units will be this skill unless directly set
-
-# TODO - Consider moving the above into a config file to avoid confusion with the real code below.
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'damage_simulator.cfg')
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -23,6 +15,9 @@ SHORT_RANGE = 0
 MEDIUM_RANGE = 1
 LONG_RANGE = 2
 RANDOM_RANGE = -1
+FAST_UNIT_CAUSES_SLOW_APPROACH = -2
+INITIATIVE_HELPS_FASTER_MINIMIZE_HIT_CHANCE = -3
+INITIATIVE_HELPS_FASTER_MAXIMIZE_DAMAGE = -4
 
 # Unit types
 MECH = 0
@@ -38,6 +33,32 @@ WHEELED = 2
 HOVER = 3
 VTOL = 4
 WIGE = 5
+
+# Attacker/Defender
+ATTACKER = 0
+DEFENDER = 0
+
+
+def config_read(config_file):
+    my_config = ConfigParser.SafeConfigParser({'log_file_path': '',
+                                               'csv_output_file_path': '',
+                                               'bbcode_output_file_path': '',
+                                               'log_level': 30,
+                                               'battle_runs': 1,
+                                               'range_determination': 'fixed_short'})
+    my_config.read(config_file)
+    dict1 = {}
+    section = 'run_settings'
+    options = my_config.options(section)
+    for option in options:
+        try:
+            dict1[option] = my_config.get(section, option)
+            if dict1[option] == -1:
+                print("skip: %s" % option)
+        except:
+            print("exception on %s!" % option)
+            dict1[option] = None
+    return dict1
 
 
 class CombatUnit(object):
@@ -89,7 +110,7 @@ class CombatUnit(object):
             elif self.motive_type == VTOL or self.motive_type == WIGE:
                 motive_roll += 2
             if motive_roll == 9 or motive_roll == 10:
-                self.movement = min(0, self.movement - 2)
+                self.movement = max(0, self.movement - 2)
                 logging.info(self.name + ' Motive hit: movement reduced to ' + str(self.movement))
             elif motive_roll == 11:
                 movement_loss = divide_by_two_round_up(self.movement)
@@ -138,7 +159,7 @@ class CombatUnit(object):
                 logging.debug('Weapons now ' + str(self.weapons))
             elif crit_roll == 7:
                 logging.debug('MP Hit')
-                movement_loss = min(2, divide_by_two_round_up(self.movement))
+                movement_loss = max(2, divide_by_two_round_up(self.movement))
                 self.movement = max(0, self.movement - movement_loss)
                 self.movement_mod = movement_mod(self.movement)
                 logging.debug('New movement mod: ' + str(self.movement_mod))
@@ -161,7 +182,7 @@ class CombatUnit(object):
             elif crit_roll == 3:
                 logging.debug('Crew Stunned')
                 self.crits.append('Crew Stunned')
-                # TODO - figure out a way to implement this
+                # TODO - figure out a way to implement this; probably add to self.crits and remove it when triggered.
             elif crit_roll == 4 or crit_roll == 5:
                 logging.debug('Fire Control hit')
                 self.skill += 2
@@ -196,7 +217,7 @@ class CombatUnit(object):
                       str(self.weapons) + ' ' + str(self.crits))
 
 
-def unit_create_from_dict(stat_dict):
+def unit_create_from_dict(stat_dict, default_skill_level=4):
     # name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None
     try:
         unit_name = stat_dict['name']
@@ -228,7 +249,7 @@ def unit_create_from_dict(stat_dict):
     try:
         unit_skill = stat_dict['skill']
     except KeyError:
-        unit_skill = DEFAULT_SKILL_LEVEL
+        unit_skill = default_skill_level
     try:
         unit_motive = stat_dict['motive']
     except KeyError:
@@ -343,29 +364,80 @@ def roll_to_hit(skill, range_mod, def_mod, terrain=0):
         return False, die_roll
 
 
-def one_vs_one(first_unit, second_unit, range_band):
+def range_get(range_algorithm, current_round, initiative_winner, range_previous, attacker, defender):
+    if attacker.movement == 0 and defender.movement == 0:
+        return range_previous
+    if range_algorithm == SHORT_RANGE:
+        return SHORT_RANGE
+    elif range_algorithm == MEDIUM_RANGE:
+        return MEDIUM_RANGE
+    elif range_algorithm == LONG_RANGE:
+        return MEDIUM_RANGE
+    elif range_algorithm == RANDOM_RANGE:
+        if current_round == 1:
+            logging.debug('Randomly determined range: First round; long range.')
+            return LONG_RANGE
+        elif current_round == 2:
+            logging.debug('Randomly determined range: Second round; medium range.')
+            return MEDIUM_RANGE
+        else:
+            # Randomly choose between short and medium range
+            new_range = random.randint(0, 1)
+            logging.debug('Randomly determined range: ' + str(new_range))
+            return new_range
+    elif range_algorithm == FAST_UNIT_CAUSES_SLOW_APPROACH:
+        if attacker.movement > defender.movement:
+            faster_unit = attacker
+            slower_unit = defender
+        else:
+            faster_unit = defender
+            slower_unit = attacker
+        speed_difference = abs(attacker.movement - defender.movement)
+        if speed_difference == 0:
+            logging.debug('Range calc: No speed difference; stick to long range for first 2 rounds, then medium.')
+            if current_round <= 2:
+                return LONG_RANGE
+            else:
+                return MEDIUM_RANGE
+        elif slower_unit.movement == 0:
+            logging.debug('Range calc: Slower unit immobilized. '
+                          'Faster unit picks longest range at which it can deal damage.')
+            if faster_unit.weapons[LONG_RANGE] > 0:
+                return LONG_RANGE
+            elif faster_unit.weapons[MEDIUM_RANGE] > 0:
+                return MEDIUM_RANGE
+            else:
+                return SHORT_RANGE
+        elif current_round < 36/slower_unit.movement:
+            logging.debug('Range calc: On approach. Longest range at which faster unit has weapons.')
+            if faster_unit.weapons[LONG_RANGE] > 0:
+                return LONG_RANGE
+            elif faster_unit.weapons[MEDIUM_RANGE] > 0:
+                return MEDIUM_RANGE
+            else:
+                return SHORT_RANGE
+        else:
+            logging.debug('Range calc: Dueling. '
+                          'Assuming faster unit can remain at medium range (or short if it has no medium damage).')
+            if faster_unit.weapons[MEDIUM_RANGE] > 0:
+                return MEDIUM_RANGE
+            else:
+                return SHORT_RANGE
+
+def one_vs_one(first_unit, second_unit, range_algorithm):
     round_count = 0
     battle_attacker_roll_total = 0
     battle_attacker_rolls = 0
     battle_defender_roll_total = 0
     battle_defender_rolls = 0
+    range_previous = LONG_RANGE
     while first_unit.structure > 0 and second_unit.structure > 0:
         round_count += 1
         logging.debug('========== ROUND ' + str(round_count) + ' ==========')
-        if range_band not in [SHORT_RANGE, MEDIUM_RANGE, LONG_RANGE]:
-            # Start at Long, then random short & medium
-            if round_count == 1:
-                current_range_band = LONG_RANGE
-                range_mod = 4
-                logging.debug('First round: long range')
-            else:
-                current_range_band = random.randint(0, 1)
-                range_mod = 2 * current_range_band
-                logging.debug('Later round; range mod ' + str(range_mod))
-        else:
-            # Fixed range
-            range_mod = 2 * range_band
-            current_range_band = range_band
+        initiative_winner = random.randint(0,1)
+        range_band = range_get(range_algorithm, round_count, initiative_winner, range_previous, first_unit, second_unit)
+        range_mod = 2 * range_band
+        range_previous = range_band
         if first_unit.movement_mod == 0:
             attacker_mods = -1
         else:
@@ -388,8 +460,8 @@ def one_vs_one(first_unit, second_unit, range_band):
                                                     first_unit.movement_mod)
         battle_defender_roll_total += actual_roll
         battle_defender_rolls += 1
-        attacker_weapons = int(first_unit.weapons[current_range_band])
-        defender_weapons = int(second_unit.weapons[current_range_band])
+        attacker_weapons = int(first_unit.weapons[range_band])
+        defender_weapons = int(second_unit.weapons[range_band])
         if attacker_was_hit:
             first_unit.motive_check()
             first_unit.apply_damage(defender_weapons, second_unit.special)
@@ -421,106 +493,136 @@ def one_vs_one(first_unit, second_unit, range_band):
             'attacker_roll_total': battle_attacker_roll_total, 'attacker_rolls': battle_attacker_rolls,
             'defender_roll_total': battle_defender_roll_total, 'defender_rolls': battle_defender_rolls}
 
+
 if __name__ == "__main__":
-    logging_configure(LOG_FILE, LOG_LEVEL)
-    unit_list = unit_list_read_from_json(UNIT_LIST_PATH)
+    try:
+        config = config_read(CONFIG_FILE)
+    except BaseException as why:
+        print('Failed to read config file: ' + CONFIG_FILE)
+        print('Error: ' + str(why))
+        quit()
+    logging_configure(config['log_file_path'], int(config['log_level']))
+    unit_list = unit_list_read_from_json(config['unit_list_path'])
     random.seed()
     # dice_test(100000)
     attacker_roll_total = 0
     attacker_rolls = 0
     defender_roll_total = 0
     defender_rolls = 0
-    if len(CSV_FILEPATH) > 0:
+    if config['range_determination'] == 'fixed_short':
+        range_determination_method = SHORT_RANGE
+    elif config['range_determination'] == 'fixed_medium':
+        range_determination_method = MEDIUM_RANGE
+    elif config['range_determination'] == 'fixed_long':
+        range_determination_method = LONG_RANGE
+    elif config['range_determination'] == 'random':
+        range_determination_method = RANDOM_RANGE
+    elif config['range_determination'] == 'fast_unit_causes_slow_approach':
+        range_determination_method = FAST_UNIT_CAUSES_SLOW_APPROACH
+    # TODO - range_determination = initiative_helps_faster_minimize_hit_chance  ***NOT YET IMPLEMENTED***
+    # TODO - range_determination = initiative_helps_faster_maximize_damage  ***NOT YET IMPLEMENTED***
+
+    if len(config['csv_output_file_path']) > 0:
         csv_write = True
+        bbcode_write = False
         try:
-            csv_file = open(CSV_FILEPATH, 'wb')
+            output_file_csv = open(config['csv_output_file_path'], 'wb')
         except BaseException as why:
-            logging.error('Failed to open CSV file ' + CSV_FILEPATH + ' - ' + str(why))
+            logging.error('Failed to open CSV file ' + config['csv_output_file_path'] + ' - ' + str(why))
             csv_write = False
     else:
         csv_write = False
+    if len(config['bbcode_output_file_path']) > 0:
+        bbcode_write = True
+        try:
+            output_file_bbcode = open(config['bbcode_output_file_path'], 'wb')
+        except BaseException as why:
+            logging.error('Failed to open BBCode file ' + config['bbcode_output_file_path'] + ' - ' + str(why))
+            bbcode_write = False
+    else:
+        bbcode_write = False
     defender_list = []
     completed_attackers = []
-    if OUTPUT_AS_BBCODE:
-        logging.critical('[table][tr][td]Attacker \ Defender[/td]')
+    if bbcode_write:
+        output_file_bbcode.write('[table][tr][td]Attacker \ Defender[/td]')
     if csv_write:
         csv_fields = ['Attacker']
     for defender in unit_list:
         defender_list.append(defender)
-        if OUTPUT_AS_BBCODE:
-            logging.critical('[td]' + defender['name'] + '[/td]')
+        if bbcode_write:
+            output_file_bbcode.write('[td]' + defender['name'] + '[/td]')
         if csv_write:
             csv_fields.append(defender['name'])
-    if OUTPUT_AS_BBCODE:
-        logging.critical('[/tr]')
+    if bbcode_write:
+        output_file_bbcode.write('[/tr]')
     if csv_write:
-        csv_writer = csv.DictWriter(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
+        csv_writer = csv.DictWriter(output_file_csv, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
                                     fieldnames=csv_fields)
         csv_writer.writeheader()
     for attacker in unit_list:
-        if OUTPUT_AS_BBCODE:
-            logging.critical('[tr][td]' + attacker['name'] + '[/td]')
+        if bbcode_write:
+            output_file_bbcode.write('[tr][td]' + attacker['name'] + '[/td]')
         if csv_write:
             csv_line = {'Attacker': attacker['name']}
         for defender in defender_list:
             if attacker['name'] == defender['name']:
                 logging.debug('Identical units; skipping.')
-                if OUTPUT_AS_BBCODE:
-                    logging.critical('[td]-----[/td]')
+                if bbcode_write:
+                    output_file_bbcode.write('[td]-----[/td]')
                 if csv_write:
                     csv_line[defender['name']] = 'N/A'
                 continue
             if attacker['name'] in completed_attackers:
                 # TODO - this isn't working
                 logging.debug('Pairing already run; skipping.')
-                if OUTPUT_AS_BBCODE:
-                    logging.critical('[td]-----[/td]')
+                if bbcode_write:
+                    output_file_bbcode.write('[td]-----[/td]')
                 if csv_write:
                     csv_line[defender['name']] = 'N/A'
                 continue
             wins = [0, 0, 0]  # Ties, Attacker, Defender
             rounds = 0
-            for battle in range(0, BATTLE_RUNS):
-                attacking_unit = unit_create_from_dict(attacker)
-                defending_unit = unit_create_from_dict(defender)
-                result_dict = one_vs_one(attacking_unit, defending_unit, RANDOM_RANGE)
+            for battle in range(0, int(config['battle_runs'])):
+                attacking_unit = unit_create_from_dict(attacker, int(config['skill_level_default']))
+                defending_unit = unit_create_from_dict(defender, int(config['skill_level_default']))
+                result_dict = one_vs_one(attacking_unit, defending_unit, range_determination_method)
                 wins[result_dict['winner']] += 1
                 rounds += result_dict['rounds']
                 attacker_roll_total += result_dict['attacker_roll_total']
                 attacker_rolls += result_dict['attacker_rolls']
                 defender_roll_total += result_dict['defender_roll_total']
                 defender_rolls += result_dict['defender_rolls']
-            if OUTPUT_AS_BBCODE:
+            if bbcode_write:
                 if wins[1] > wins[2]:
-                    logging.critical('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) + '/' +
-                                     str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) +
+                    output_file_bbcode.write('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) + '/' +
+                                     str(wins[0]) + '(' + str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
                                      ')[/td]')
                 else:
-                    logging.critical('[td]' + defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) + '/' +
-                                     str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) +
+                    output_file_bbcode.write('[td]' + defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) + '/' +
+                                     str(wins[0]) + '(' + str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
                                      ')[/td]')
-            else:
-                logging.critical('====================')
-                logging.critical(attacker['name'] + ': ' + str(wins[1]))
-                logging.critical(defender['name'] + ': ' + str(wins[2]))
-                logging.critical('Ties: ' + str(wins[0]))
-                logging.critical('Average battle length: ' + str(round(float(rounds) / float(BATTLE_RUNS), 1)))
+            logging.critical('====================')
+            logging.critical(attacker['name'] + ': ' + str(wins[1]))
+            logging.critical(defender['name'] + ': ' + str(wins[2]))
+            logging.critical('Ties: ' + str(wins[0]))
+            logging.critical('Average battle length: ' + str(round(float(rounds) / float(int(config['battle_runs'])), 1)))
             if csv_write:
                 if wins[1] > wins[2]:
                     output_text = attacker['name'] + ':' + str(wins[1]) + '/' + str(wins[2]) + '/' + \
-                                  str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) + ')'
+                                  str(wins[0]) + '(' + str(round(float(rounds) / float(config['battle_runs']), 1)) + ')'
                 else:
                     output_text = defender['name'] + ':' + str(wins[2]) + '/' + str(wins[1]) + '/' + \
-                                  str(wins[0]) + '(' + str(round(float(rounds) / float(BATTLE_RUNS), 1)) + ')'
+                                  str(wins[0]) + '(' + str(round(float(rounds) / float(config['battle_runs']), 1)) + ')'
                 csv_line[defender['name']] = output_text
         completed_attackers.append(attacker['name'])
-        if OUTPUT_AS_BBCODE:
-            logging.critical('[/tr]')
+        if bbcode_write:
+            output_file_bbcode.write('[/tr]')
         if csv_write:
             csv_writer.writerow(csv_line)
-    if OUTPUT_AS_BBCODE:
-        logging.critical('[/table]')
+    if bbcode_write:
+        output_file_bbcode.write('[/table]')
+        output_file_bbcode.close()
     if csv_write:
-        csv_file.close()
+        output_file_csv.close()
     logging.debug('Average attacker to-hit roll: ' + str(round(attacker_roll_total/float(attacker_rolls), 3)))
     logging.debug('Average defender to-hit roll: ' + str(round(defender_roll_total / float(defender_rolls), 3)))
