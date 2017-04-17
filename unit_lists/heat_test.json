@@ -1,0 +1,4 @@
+[
+{"name":"Thug THG-10E", "type":0, "armor":8, "structure":6, "weapons":[3, 3, 2], "move":8, "special":[]},
+{"name":"Jinggau JN-G7L", "type":0, "armor":6, "structure":3, "weapons":[4, 4, 0], "move":10, "special":["ENE", "HT1/1/0"]}
+  ]

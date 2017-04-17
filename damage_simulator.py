@@ -7,6 +7,7 @@ import json
 import ConfigParser
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'damage_simulator.cfg')
+__version__ = 1.1
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -70,7 +71,6 @@ class CombatUnit(object):
         self.structure = structure
         self.weapons = weapons
         self.movement = movement
-        self.movement_mod = movement_mod(self.movement)
         self.motive_type = motive_type
         self.skill = skill
         if not (special is None):
@@ -78,13 +78,43 @@ class CombatUnit(object):
         else:
             self.special = []
         self.crits = []
+        self.heat = 0
 
-    def apply_damage(self, damage, attacker_specials=''):
+    def effective_skill(self):
+        return self.skill + self.heat
+
+    def effective_movement(self):
+        return max(0, self.movement - (self.heat * 2))
+
+    def movement_mod(self):
+        return movement_mod(self.effective_movement())
+
+    def damage_apply(self, damage, attack_range=SHORT_RANGE, attacker_specials=''):
         logging.debug('Applying ' + str(damage) + ' damage to ' + self.name)
+        heat_added = 0
+        if damage > 0:
+            # Check for HT#/#/#
+            for sa in attacker_specials:
+                if len(sa) >= 7:
+                    if sa[:2] == 'HT':
+                        heat_text = sa[2:]
+                        heat_array = heat_text.split('/')
+                        try:
+                            heat_added = int(heat_array[attack_range])
+                        except BaseException as why:
+                            logging.error('Error getting HT number: ' + str(why))
         if 'RFA' in self.special:
             if 'ENE' in attacker_specials:
                 logging.debug('Reflective Armor reduces damage by half.')
                 damage = divide_by_two_round_up(damage)
+                heat_added = divide_by_two_round_up(heat_added)
+            elif heat_added > 0:
+                heat_added = divide_by_two_round_up(heat_added)
+                damage = max(0, damage - heat_added)
+        if heat_added > 0 and self.type != MECH:
+            # Not a heat-tracking unit; added HT to Damage
+            damage += heat_added
+            heat_added = 0
         if damage <= self.armor:
             self.armor -= damage
             logging.debug(str(damage) + ' applied to armor; ' + str(self.armor) + ' armor remaining.')
@@ -101,6 +131,23 @@ class CombatUnit(object):
             else:
                 self.structure = 0
                 logging.info('Unit ' + self.name + ' destroyed.')
+        if self.structure > 0 and self.type == MECH and heat_added > 0:
+            # Add heat, but not more than 2
+            self.heat_apply(min(heat_added, 2))
+
+    def heat_apply(self, heat):
+        if self.type == MECH:
+            self.heat += heat
+            logging.debug(self.name + ' new heat: ' + str(self.heat))
+            return self.heat
+        else:
+            logging.error('Tried to add heat to a non-heat-tracking unit.')
+            return 0
+
+    def heat_remove(self):
+        if self.type == MECH and self.structure > 0:
+            logging.debug(self.name + ' cooling off.')
+            self.heat = 0
 
     def motive_check(self):
         if self.type == VEHICLE:
@@ -121,7 +168,6 @@ class CombatUnit(object):
                 logging.info(self.name + 'Motive hit: movement reduced to 0')
             else:
                 logging.debug('Motive hit: No effect.')
-            self.movement_mod = movement_mod(self.movement)
 
     def apply_crit(self, crit_roll):
         if 'CR' in self.special:
@@ -134,7 +180,7 @@ class CombatUnit(object):
                     logging.debug('Ignored due to ENE special.')
                 elif 'CASE' in self .special:
                     logging.debug('CASE. Appling 1 extra damage.')
-                    self.apply_damage(1)
+                    self.damage_apply(1)
                 else:
                     logging.debug('Unit destroyed.')
                     self.structure = 0
@@ -145,10 +191,6 @@ class CombatUnit(object):
                     self.structure = 0
                 else:
                     self.crits.append('Engine hit')
-                    # decrease firepower to 50% to simulate overheating
-                    for range_band in [0, 1, 2]:
-                        self.weapons[range_band] = divide_by_two_round_up(self.weapons[range_band])
-                    logging.debug('Weapons now ' + str(self.weapons))
             elif crit_roll == 4 or crit_roll == 10:
                 logging.debug('Fire Control hit')
                 self.skill += 2
@@ -161,8 +203,7 @@ class CombatUnit(object):
                 logging.debug('MP Hit')
                 movement_loss = max(2, divide_by_two_round_up(self.movement))
                 self.movement = max(0, self.movement - movement_loss)
-                self.movement_mod = movement_mod(self.movement)
-                logging.debug('New movement mod: ' + str(self.movement_mod))
+                logging.debug('New movement mod: ' + str(self.movement_mod()))
             elif crit_roll == 12:
                 logging.debug('Unit destroyed.')
                 self.structure = 0
@@ -175,7 +216,7 @@ class CombatUnit(object):
                     logging.debug('Ignored due to ENE special.')
                 elif 'CASE' in self .special:
                     logging.debug('CASE. Appling 1 extra damage.')
-                    self.apply_damage(1)
+                    self.damage_apply(1)
                 else:
                     logging.debug('Unit destroyed.')
                     self.structure = 0
@@ -202,8 +243,7 @@ class CombatUnit(object):
                 else:
                     self.crits.append('Engine Hit')
                     self.movement = divide_by_two_round_up(self.movement)
-                    self.movement_mod = movement_mod(self.movement)
-                    logging.debug('New movement mod: ' + str(self.movement_mod))
+                    logging.debug('New movement mod: ' + str(self.movement_mod()))
                     for range_band in [0, 1, 2]:
                         self.weapons[range_band] = divide_by_two_round_up(self.weapons[range_band])
             else:
@@ -212,9 +252,14 @@ class CombatUnit(object):
             logging.debug('Crits not yet implemented for Protomechs')
             # TODO - implement crits
 
+    def crit_clear(self):
+        for crit in self.crits[:]:
+            if crit in ['Crew Stunned']:
+                self.crits.remove(crit)
+
     def state_log(self):
         logging.debug(self.name + ': ' + str(self.armor) + '/' + str(self.structure) + ' ' +
-                      str(self.weapons) + ' ' + str(self.crits))
+                      str(self.weapons) + ' ' + str(self.crits) + ' HT:' + str(self.heat))
 
 
 def unit_create_from_dict(stat_dict, default_skill_level=4):
@@ -358,14 +403,14 @@ def roll_to_hit(skill, range_mod, def_mod, terrain=0):
     die_roll = two_d6()
     if die_roll >= target_number:
         logging.debug('Hit! (Needed ' + str(target_number) + ', rolled ' + str(die_roll) + ')')
-        return True, die_roll
+        return True
     else:
         logging.debug('Miss! (Needed ' + str(target_number) + ', rolled ' + str(die_roll) + ')')
-        return False, die_roll
+        return False
 
 
-def range_get(range_algorithm, current_round, initiative_winner, range_previous, attacker, defender):
-    if attacker.movement == 0 and defender.movement == 0:
+def range_get(range_algorithm, current_round, initiative_winner, range_previous, unit_1, unit_2):
+    if unit_1.movement == 0 and unit_2.movement == 0:
         return range_previous
     if range_algorithm == SHORT_RANGE:
         return SHORT_RANGE
@@ -386,13 +431,13 @@ def range_get(range_algorithm, current_round, initiative_winner, range_previous,
             logging.debug('Randomly determined range: ' + str(new_range))
             return new_range
     elif range_algorithm == FAST_UNIT_CAUSES_SLOW_APPROACH:
-        if attacker.movement > defender.movement:
-            faster_unit = attacker
-            slower_unit = defender
+        if unit_1.movement > unit_2.movement:
+            faster_unit = unit_1
+            slower_unit = unit_2
         else:
-            faster_unit = defender
-            slower_unit = attacker
-        speed_difference = abs(attacker.movement - defender.movement)
+            faster_unit = unit_2
+            slower_unit = unit_1
+        speed_difference = abs(unit_1.movement - unit_2.movement)
         if speed_difference == 0:
             logging.debug('Range calc: No speed difference; stick to long range for first 2 rounds, then medium.')
             if current_round <= 2:
@@ -424,50 +469,70 @@ def range_get(range_algorithm, current_round, initiative_winner, range_previous,
             else:
                 return SHORT_RANGE
 
+
 def one_vs_one(first_unit, second_unit, range_algorithm):
     round_count = 0
-    battle_attacker_roll_total = 0
-    battle_attacker_rolls = 0
-    battle_defender_roll_total = 0
-    battle_defender_rolls = 0
     range_previous = LONG_RANGE
     while first_unit.structure > 0 and second_unit.structure > 0:
         round_count += 1
         logging.debug('========== ROUND ' + str(round_count) + ' ==========')
-        initiative_winner = random.randint(0,1)
+        initiative_winner = random.randint(0, 1)
         range_band = range_get(range_algorithm, round_count, initiative_winner, range_previous, first_unit, second_unit)
         range_mod = 2 * range_band
         range_previous = range_band
-        if first_unit.movement_mod == 0:
-            attacker_mods = -1
+        if first_unit.heat <= int(config['max_tolerable_heat']):
+            # Compute first unit mods and roll to hit
+            if first_unit.movement_mod() == 0:
+                first_unit_mods = -1
+            else:
+                first_unit_mods = 0
+            if 'STL' in second_unit.special:
+                first_unit_mods += int(float(range_mod) / 2)
+            logging.debug(first_unit.name + ' shoots ' + second_unit.name)
+            second_unit_was_hit = roll_to_hit(first_unit.effective_skill() + first_unit_mods,
+                                              range_mod,
+                                              second_unit.movement_mod())
+            first_unit_fired = True
         else:
-            attacker_mods = 0
-        if second_unit.movement_mod == 0:
-            defender_mods = -1
+            logging.debug(first_unit.name + ' overheated; does not fire.')
+            first_unit_fired = False
+            second_unit_was_hit = False
+        if second_unit.heat <= int(config['max_tolerable_heat']):
+            # Compute second unit mods and roll to hit
+            if second_unit.movement_mod() == 0:
+                second_unit_mods = -1
+            else:
+                second_unit_mods = 0
+            if 'STL' in first_unit.special:
+                second_unit_mods += int(float(range_mod) / 2)
+            logging.debug(second_unit.name + ' shoots ' + first_unit.name)
+            first_unit_was_hit = roll_to_hit(second_unit.effective_skill() + second_unit_mods,
+                                             range_mod,
+                                             first_unit.movement_mod())
+            second_unit_fired = True
         else:
-            defender_mods = 0
-        if 'STL' in first_unit.special:
-            defender_mods += int(float(range_mod) / 2)
-        if 'STL' in second_unit.special:
-            attacker_mods += int(float(range_mod) / 2)
-        logging.debug(first_unit.name + ' shoots ' + second_unit.name)
-        defender_was_hit, actual_roll = roll_to_hit(first_unit.skill + attacker_mods, range_mod,
-                                                    second_unit.movement_mod)
-        battle_attacker_roll_total += actual_roll
-        battle_attacker_rolls += 1
-        logging.debug(second_unit.name + ' shoots ' + first_unit.name)
-        attacker_was_hit, actual_roll = roll_to_hit(second_unit.skill + defender_mods, range_mod,
-                                                    first_unit.movement_mod)
-        battle_defender_roll_total += actual_roll
-        battle_defender_rolls += 1
-        attacker_weapons = int(first_unit.weapons[range_band])
-        defender_weapons = int(second_unit.weapons[range_band])
-        if attacker_was_hit:
+            logging.debug(first_unit.name + ' overheated; does not fire.')
+            second_unit_fired = False
+            first_unit_was_hit = False
+        first_unit_weapons = int(first_unit.weapons[range_band])
+        second_unit_weapons = int(second_unit.weapons[range_band])
+        if first_unit_was_hit:
             first_unit.motive_check()
-            first_unit.apply_damage(defender_weapons, second_unit.special)
-        if defender_was_hit:
+            first_unit.damage_apply(second_unit_weapons, attack_range=range_band, attacker_specials=second_unit.special)
+        if second_unit_was_hit:
             second_unit.motive_check()
-            second_unit.apply_damage(attacker_weapons, first_unit.special)
+            second_unit.damage_apply(first_unit_weapons, attack_range=range_band, attacker_specials=first_unit.special)
+        #End Phase
+        if first_unit_fired and ('Engine hit' in first_unit.crits):
+            first_unit.heat_apply(1)
+        elif not first_unit_fired:
+            first_unit.heat_remove()
+        if second_unit_fired and ('Engine hit' in second_unit.crits):
+            second_unit.heat_apply(1)
+        elif not second_unit_fired:
+            second_unit.heat_remove()
+        first_unit.crit_clear()
+        second_unit.crit_clear()
         first_unit.state_log()
         second_unit.state_log()
         if round_count > MAX_ROUNDS:
@@ -489,9 +554,7 @@ def one_vs_one(first_unit, second_unit, range_algorithm):
     else:
         logging.error('Unsupported game end state.')
         winner = 0
-    return {'winner': winner, 'rounds': round_count,
-            'attacker_roll_total': battle_attacker_roll_total, 'attacker_rolls': battle_attacker_rolls,
-            'defender_roll_total': battle_defender_roll_total, 'defender_rolls': battle_defender_rolls}
+    return {'winner': winner, 'rounds': round_count}
 
 
 if __name__ == "__main__":
@@ -588,24 +651,23 @@ if __name__ == "__main__":
                 result_dict = one_vs_one(attacking_unit, defending_unit, range_determination_method)
                 wins[result_dict['winner']] += 1
                 rounds += result_dict['rounds']
-                attacker_roll_total += result_dict['attacker_roll_total']
-                attacker_rolls += result_dict['attacker_rolls']
-                defender_roll_total += result_dict['defender_roll_total']
-                defender_rolls += result_dict['defender_rolls']
             if bbcode_write:
                 if wins[1] > wins[2]:
-                    output_file_bbcode.write('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) + '/' +
-                                     str(wins[0]) + '(' + str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
-                                     ')[/td]')
+                    output_file_bbcode.write('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) +
+                                             '/' + str(wins[0]) + '(' +
+                                             str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
+                                             ')[/td]')
                 else:
-                    output_file_bbcode.write('[td]' + defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) + '/' +
-                                     str(wins[0]) + '(' + str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
-                                     ')[/td]')
+                    output_file_bbcode.write('[td]' + defender['name'] + ': ' + str(wins[2]) + '/' + str(wins[1]) +
+                                             '/' + str(wins[0]) + '(' +
+                                             str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
+                                             ')[/td]')
             logging.critical('====================')
             logging.critical(attacker['name'] + ': ' + str(wins[1]))
             logging.critical(defender['name'] + ': ' + str(wins[2]))
             logging.critical('Ties: ' + str(wins[0]))
-            logging.critical('Average battle length: ' + str(round(float(rounds) / float(int(config['battle_runs'])), 1)))
+            logging.critical('Average battle length: ' +
+                             str(round(float(rounds) / float(int(config['battle_runs'])), 1)))
             if csv_write:
                 if wins[1] > wins[2]:
                     output_text = attacker['name'] + ':' + str(wins[1]) + '/' + str(wins[2]) + '/' + \
@@ -624,5 +686,3 @@ if __name__ == "__main__":
         output_file_bbcode.close()
     if csv_write:
         output_file_csv.close()
-    logging.debug('Average attacker to-hit roll: ' + str(round(attacker_roll_total/float(attacker_rolls), 3)))
-    logging.debug('Average defender to-hit roll: ' + str(round(defender_roll_total / float(defender_rolls), 3)))
