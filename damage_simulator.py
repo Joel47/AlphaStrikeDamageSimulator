@@ -7,7 +7,7 @@ import json
 import ConfigParser
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'damage_simulator.cfg')
-__version__ = 1.1
+__version__ = 1.2
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -19,6 +19,7 @@ RANDOM_RANGE = -1
 FAST_UNIT_CAUSES_SLOW_APPROACH = -2
 INITIATIVE_HELPS_FASTER_MINIMIZE_HIT_CHANCE = -3
 INITIATIVE_HELPS_FASTER_MAXIMIZE_DAMAGE = -4
+FAST_UNIT_MINIMIZES_DAMAGE = -5
 
 # Unit types
 MECH = 0
@@ -68,7 +69,9 @@ class CombatUnit(object):
         self.name = name
         self.type = unit_type
         self.armor = armor
+        self.armor_original = armor
         self.structure = structure
+        self.structure_original = structure
         self.weapons = weapons
         self.movement = movement
         self.motive_type = motive_type
@@ -81,7 +84,10 @@ class CombatUnit(object):
         self.heat = 0
 
     def effective_skill(self):
-        return self.skill + self.heat
+        misc_bonuses = 0
+        if 'SHLD' in self.special:
+            misc_bonuses += 1
+        return self.skill + self.heat + misc_bonuses
 
     def effective_movement(self):
         return max(0, self.movement - (self.heat * 2))
@@ -89,7 +95,7 @@ class CombatUnit(object):
     def movement_mod(self):
         return movement_mod(self.effective_movement())
 
-    def damage_apply(self, damage, attack_range=SHORT_RANGE, attacker_specials=''):
+    def damage_apply(self, damage, attack_range=SHORT_RANGE, attacker_specials='', is_area_effect=False):
         logging.debug('Applying ' + str(damage) + ' damage to ' + self.name)
         heat_added = 0
         if damage > 0:
@@ -111,6 +117,18 @@ class CombatUnit(object):
             elif heat_added > 0:
                 heat_added = divide_by_two_round_up(heat_added)
                 damage = max(0, damage - heat_added)
+        if 'SHLD' in self.special:
+            if not is_area_effect:
+                logging.debug('SHLD prevents 1 point of damage.')
+                damage = max(0, damage - 1)
+        if 'AMS' in self.special or 'RAMS' in self.special:
+            ams_active = False
+            for special in attacker_specials:
+                if special[:3] == 'LRM' or special[:3] == 'SRM' or special[:2] == 'IF':
+                    ams_active = True
+            if ams_active:
+                logging.debug('AMS prevents 1 point of damage.')
+                damage = max(0, damage - 1)
         if heat_added > 0 and self.type != MECH:
             # Not a heat-tracking unit; added HT to Damage
             damage += heat_added
@@ -261,6 +279,23 @@ class CombatUnit(object):
         logging.debug(self.name + ': ' + str(self.armor) + '/' + str(self.structure) + ' ' +
                       str(self.weapons) + ' ' + str(self.crits) + ' HT:' + str(self.heat))
 
+    def round_complete(self):
+        self.crit_clear()
+        if 'BHJ2' in self.special:
+            if self.armor > 0:
+                self.armor = max(self.armor_original, self.armor + 1)
+                logging.debug('Using BHJ2 to restore 1 point of armor.')
+        elif 'BHJ3' in self.special:
+            if self.armor > 0:
+                self.armor = max(self.armor_original, self.armor + 2)
+                logging.debug('Using BHJ3 to restore 2 points of armor.')
+        if 'RHS' in self.special and self.heat > 0:
+            logging.debug('Using RHS to cool down.')
+            self.heat -= 1
+            if random.randint(1, 6) == 1:
+                logging.info('RHS check rolled a 1. Disabling RHS.')
+                self.special.remove('RHS')
+
 
 def unit_create_from_dict(stat_dict, default_skill_level=4):
     # name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None
@@ -310,8 +345,7 @@ def unit_create_from_dict(stat_dict, default_skill_level=4):
 def unit_list_read_from_json(json_path):
     with open(json_path) as json_data:
         units = json.load(json_data)
-    logging.debug('Read unit list ' + json_path + ':')
-    logging.debug(str(units))
+    logging.debug('Reading unit list ' + json_path)
     return units
 
 
@@ -409,6 +443,64 @@ def roll_to_hit(skill, range_mod, def_mod, terrain=0):
         return False
 
 
+def probability_to_hit(target_number):
+    if target_number <= 2:
+        return 1
+    elif target_number == 3:
+        return 0.9722
+    elif target_number == 4:
+        return 0.9166
+    elif target_number == 5:
+        return 0.8333
+    elif target_number == 6:
+        return 0.7222
+    elif target_number == 7:
+        return 0.5833
+    elif target_number == 8:
+        return 0.4166
+    elif target_number == 9:
+        return 0.2777
+    elif target_number == 10:
+        return 0.1666
+    elif target_number == 11:
+        return 0.0833
+    elif target_number == 12:
+        return 0.0277
+    else:
+        return 0
+
+
+def average_damage(base_damage, target_number):
+    return float(base_damage) * probability_to_hit(target_number)
+
+def range_for_least_defender_damage(attacker, defender):
+    # set "minimum damage" to 100 for all range bands, since that's much higher than any unit can have
+    attacker_damage = [100, 100, 100]
+    for attacker_range in [SHORT_RANGE, MEDIUM_RANGE, LONG_RANGE]:
+        if defender.weapons[attacker_range] > 0:
+            # Only check if the defender can shoot back
+            target_number = attacker.effective_skill() + (2 * attacker_range) + defender.movement_mod()
+            attacker_damage[attacker_range] = average_damage(defender.weapons[attacker_range], target_number)
+    if attacker_damage[SHORT_RANGE] < attacker_damage[MEDIUM_RANGE]:
+        if attacker_damage[SHORT_RANGE] < attacker_damage[LONG_RANGE]:
+            logging.debug('Best range for defender is short. '
+                          'Expected received damage = ' + str(round(attacker_damage[SHORT_RANGE], 2)))
+            return SHORT_RANGE
+        else:
+            logging.debug('Best range for defender is long. '
+                          'Expected received damage = ' + str(round(attacker_damage[LONG_RANGE], 2)))
+            return LONG_RANGE
+    else:
+        if attacker_damage[MEDIUM_RANGE] < attacker_damage[LONG_RANGE]:
+            logging.debug('Best range for defender is medium. '
+                          'Expected received damage = ' + str(round(attacker_damage[MEDIUM_RANGE], 2)))
+            return MEDIUM_RANGE
+        else:
+            logging.debug('Best range for defender is long. '
+                          'Expected received damage = ' + str(round(attacker_damage[LONG_RANGE], 2)))
+            return LONG_RANGE
+
+
 def range_get(range_algorithm, current_round, initiative_winner, range_previous, unit_1, unit_2):
     if unit_1.movement == 0 and unit_2.movement == 0:
         return range_previous
@@ -468,6 +560,35 @@ def range_get(range_algorithm, current_round, initiative_winner, range_previous,
                 return MEDIUM_RANGE
             else:
                 return SHORT_RANGE
+    elif range_algorithm == FAST_UNIT_MINIMIZES_DAMAGE:
+        if unit_1.movement > unit_2.movement:
+            faster_unit = unit_1
+            slower_unit = unit_2
+        else:
+            faster_unit = unit_2
+            slower_unit = unit_1
+        speed_difference = abs(unit_1.movement - unit_2.movement)
+        if speed_difference == 0:
+            logging.debug('Range calc: No speed difference; stick to long range for first 2 rounds, then medium.')
+            if current_round <= 2:
+                return LONG_RANGE
+            else:
+                return MEDIUM_RANGE
+        elif slower_unit.movement == 0:
+            logging.debug('Range calc: Slower unit immobilized. '
+                          'Faster unit picks range to minimize incoming damage.')
+            return range_for_least_defender_damage(slower_unit, faster_unit)
+        elif current_round == 1:
+            if faster_unit.weapons[LONG_RANGE] > 0 or slower_unit.weapons[LONG_RANGE] > 0:
+                logging.debug('Range calc: First round - long range.')
+                return LONG_RANGE
+            else:
+                logging.debug('Range calc: First round - no long range weapons on either side, so start at medium.')
+                return MEDIUM_RANGE
+        else:
+            logging.debug('Range calc: Dueling. '
+                          'Faster unit picks range to minimize incoming damage.')
+            return range_for_least_defender_damage(slower_unit, faster_unit)
 
 
 def one_vs_one(first_unit, second_unit, range_algorithm):
@@ -531,8 +652,8 @@ def one_vs_one(first_unit, second_unit, range_algorithm):
             second_unit.heat_apply(1)
         elif not second_unit_fired:
             second_unit.heat_remove()
-        first_unit.crit_clear()
-        second_unit.crit_clear()
+        first_unit.round_complete()
+        second_unit.round_complete()
         first_unit.state_log()
         second_unit.state_log()
         if round_count > MAX_ROUNDS:
@@ -582,6 +703,8 @@ if __name__ == "__main__":
         range_determination_method = RANDOM_RANGE
     elif config['range_determination'] == 'fast_unit_causes_slow_approach':
         range_determination_method = FAST_UNIT_CAUSES_SLOW_APPROACH
+    elif config['range_determination'] == 'fast_unit_minimizes_damage':
+        range_determination_method = FAST_UNIT_MINIMIZES_DAMAGE
     # TODO - range_determination = initiative_helps_faster_minimize_hit_chance  ***NOT YET IMPLEMENTED***
     # TODO - range_determination = initiative_helps_faster_maximize_damage  ***NOT YET IMPLEMENTED***
 
