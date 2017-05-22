@@ -7,7 +7,7 @@ import json
 import ConfigParser
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'damage_simulator.cfg')
-__version__ = 1.2
+__version__ = 1.3
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
