@@ -4,5 +4,7 @@
 {"name":"Dervish DV-6Mr", "type":0, "armor":4, "structure":5, "weapons":[3, 4, 2], "move":10, "special":["IF1", "LRM1/1/1"]},
 {"name":"Black Knight BLK-NT-3A", "type":0, "armor":7, "structure":3, "weapons":[4, 4, 2], "move":8, "special":["ENE", "SHLD"]},
 {"name":"Jackal JA-KL-1579", "type":0, "armor":3, "structure":1, "weapons":[1, 1, 1], "move":14, "special":["AECM", "AMS"]},
-{"name":"Osprey OSP-36 ", "type":0, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":8, "special":["CASE", "IF0*", "RAMS", "RHS"]}
-  ]
+{"name":"Osprey OSP-36", "type":0, "armor":6, "structure":3, "weapons":[2, 2, 2], "move":8, "special":["CASE", "IF0*", "RAMS", "RHS"]},
+{"name":"Hunchback HBK-7X-4", "type":0, "armor":5, "structure":4, "weapons":[3, 3, 2], "move":8, "special":["CASEII", "ARM"]},
+{"name":"Warhammer WHM-X7 The Lich", "type":0, "armor":7, "structure":4, "weapons":[3, 3, 0], "move":8, "special":["ARM", "CASE"]}
+]

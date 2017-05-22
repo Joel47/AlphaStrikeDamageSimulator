@@ -72,12 +72,12 @@ class CombatUnit(object):
         self.armor_original = armor
         self.structure = structure
         self.structure_original = structure
-        self.weapons = weapons
+        self.weapons = list(weapons)
         self.movement = movement
         self.motive_type = motive_type
         self.skill = skill
         if not (special is None):
-            self.special = special
+            self.special = list(special)
         else:
             self.special = []
         self.crits = []
@@ -188,6 +188,11 @@ class CombatUnit(object):
                 logging.debug('Motive hit: No effect.')
 
     def apply_crit(self, crit_roll):
+        for sa in self.special:
+            if sa == 'ARM':
+                logging.debug('Armored Component: ignoring crit, and crossing off ARM.')
+                self.special.remove('ARM')
+                return
         if 'CR' in self.special:
             logging.debug('Critical Resistant: -2 to crit roll')
             crit_roll -= 2
@@ -241,7 +246,6 @@ class CombatUnit(object):
             elif crit_roll == 3:
                 logging.debug('Crew Stunned')
                 self.crits.append('Crew Stunned')
-                # TODO - figure out a way to implement this; probably add to self.crits and remove it when triggered.
             elif crit_roll == 4 or crit_roll == 5:
                 logging.debug('Fire Control hit')
                 self.skill += 2
@@ -268,7 +272,7 @@ class CombatUnit(object):
                 logging.debug('No crit.')
         elif self.type == PROTOMECH:
             logging.debug('Crits not yet implemented for Protomechs')
-            # TODO - implement crits
+            # TODO - implement protomech crits
 
     def crit_clear(self):
         for crit in self.crits[:]:
@@ -277,7 +281,8 @@ class CombatUnit(object):
 
     def state_log(self):
         logging.debug(self.name + ': ' + str(self.armor) + '/' + str(self.structure) + ' ' +
-                      str(self.weapons) + ' ' + str(self.crits) + ' HT:' + str(self.heat))
+                      str(self.weapons) + ' SA:' + str(self.special) + ' Crits:' + str(self.crits) +
+                      ' HT:' + str(self.heat))
 
     def round_complete(self):
         self.crit_clear()
@@ -344,9 +349,41 @@ def unit_create_from_dict(stat_dict, default_skill_level=4):
 
 def unit_list_read_from_json(json_path):
     with open(json_path) as json_data:
-        units = json.load(json_data)
+        units = json_load_byteified(json_data)
     logging.debug('Reading unit list ' + json_path)
     return units
+
+
+def json_load_byteified(file_handle):
+    return _byteify(
+        json.load(file_handle, object_hook=_byteify),
+        ignore_dicts=True
+    )
+
+
+def json_loads_byteified(json_text):
+    return _byteify(
+        json.loads(json_text, object_hook=_byteify),
+        ignore_dicts=True
+    )
+
+
+def _byteify(data, ignore_dicts=False):
+    # if this is a unicode string, return its string representation
+    if isinstance(data, unicode):
+        return data.encode('utf-8')
+    # if this is a list of values, return list of byteified values
+    if isinstance(data, list):
+        return [_byteify(item, ignore_dicts=True) for item in data]
+    # if this is a dictionary, return dictionary of byteified keys and values
+    # but only if we haven't already byteified it
+    if isinstance(data, dict) and not ignore_dicts:
+        return {
+            _byteify(key, ignore_dicts=True): _byteify(value, ignore_dicts=True)
+            for key, value in data.iteritems()
+        }
+    # if it's anything else, return it in its original form
+    return data
 
 
 def movement_mod(movement, jumped=False):
@@ -472,6 +509,7 @@ def probability_to_hit(target_number):
 
 def average_damage(base_damage, target_number):
     return float(base_damage) * probability_to_hit(target_number)
+
 
 def range_for_least_defender_damage(attacker, defender):
     # set "minimum damage" to 100 for all range bands, since that's much higher than any unit can have
@@ -643,7 +681,7 @@ def one_vs_one(first_unit, second_unit, range_algorithm):
         if second_unit_was_hit:
             second_unit.motive_check()
             second_unit.damage_apply(first_unit_weapons, attack_range=range_band, attacker_specials=first_unit.special)
-        #End Phase
+        # End Phase
         if first_unit_fired and ('Engine hit' in first_unit.crits):
             first_unit.heat_apply(1)
         elif not first_unit_fired:
@@ -769,8 +807,8 @@ if __name__ == "__main__":
             wins = [0, 0, 0]  # Ties, Attacker, Defender
             rounds = 0
             for battle in range(0, int(config['battle_runs'])):
-                attacking_unit = unit_create_from_dict(attacker, int(config['skill_level_default']))
-                defending_unit = unit_create_from_dict(defender, int(config['skill_level_default']))
+                attacking_unit = unit_create_from_dict(attacker, default_skill_level=int(config['skill_level_default']))
+                defending_unit = unit_create_from_dict(defender, default_skill_level=int(config['skill_level_default']))
                 result_dict = one_vs_one(attacking_unit, defending_unit, range_determination_method)
                 wins[result_dict['winner']] += 1
                 rounds += result_dict['rounds']
