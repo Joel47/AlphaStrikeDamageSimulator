@@ -1,0 +1,4 @@
+[
+  {"name":"Osteon Prime", "type":0, "armor":10, "structure":10, "weapons":[10, 7, 4], "move":6, "special":["CASEII", "CR", "ECM", "IATM 10/7/3", "MHQ1", "NOVA", "OMNI", "PRB", "RCN"]},
+  {"name":"Ryoken (Stormcrow) Z", "type":0, "armor":6, "structure":3, "weapons":[8, 6, 2], "move":16, "special":["CASE", "ECM", "IATM 5/4/2", "MHQ1", "NOVA", "OMNI", "PRB", "RCN"]}
+]
