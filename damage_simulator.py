@@ -7,7 +7,7 @@ import json
 import ConfigParser
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'damage_simulator.cfg')
-__version__ = 1.3
+__version__ = 1.4
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -93,7 +93,13 @@ class CombatUnit(object):
         return max(0, self.movement - (self.heat * 2))
 
     def movement_mod(self):
-        return movement_mod(self.effective_movement())
+        other_mods = 0
+        for sa in self.special:
+            if sa == 'LG' or sa == 'VLG' or sa == 'SLG':
+                other_mods -= 1
+        if self.type == PROTOMECH or self.type == BATTLEARMOR:
+            other_mods += 1
+        return movement_mod(self.effective_movement()) + other_mods
 
     def damage_apply(self, damage, attack_range=SHORT_RANGE, attacker_specials='', is_area_effect=False):
         logging.debug('Applying ' + str(damage) + ' damage to ' + self.name)
