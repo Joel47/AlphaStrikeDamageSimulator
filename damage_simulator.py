@@ -4,10 +4,9 @@ import shutil
 import random
 import csv
 import json
-import ConfigParser
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'damage_simulator.cfg')
-__version__ = 1.4
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.json')
+__version__ = 1.5
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -15,6 +14,8 @@ MAX_ROUNDS = 100  # Avoid runaways
 SHORT_RANGE = 0
 MEDIUM_RANGE = 1
 LONG_RANGE = 2
+
+# Range algorithms
 RANDOM_RANGE = -1
 FAST_UNIT_CAUSES_SLOW_APPROACH = -2
 INITIATIVE_HELPS_FASTER_MINIMIZE_HIT_CHANCE = -3
@@ -41,26 +42,23 @@ ATTACKER = 0
 DEFENDER = 0
 
 
-def config_read(config_file):
-    my_config = ConfigParser.SafeConfigParser({'log_file_path': '',
-                                               'csv_output_file_path': '',
-                                               'bbcode_output_file_path': '',
-                                               'log_level': 30,
-                                               'battle_runs': 1,
-                                               'range_determination': 'fixed_short'})
-    my_config.read(config_file)
-    dict1 = {}
-    section = 'run_settings'
-    options = my_config.options(section)
-    for option in options:
+def config_read(json_path):
+    if not os.path.isfile(json_path):
+        raise IOError('Missing config file at ' + json_path)
+    new_config = {}
+    with open(json_path, 'r+') as user_data:
         try:
-            dict1[option] = my_config.get(section, option)
-            if dict1[option] == -1:
-                print("skip: %s" % option)
-        except:
-            print("exception on %s!" % option)
-            dict1[option] = None
-    return dict1
+            config_data = json.load(user_data)
+        except BaseException as why:
+            raise IOError('Error loading config file ' + json_path + ': ' + str(why))
+    for config_setting in config_data:
+        setting = config_setting.decode('utf-8')
+        if isinstance(config_data[setting], unicode):
+            new_config[setting] = config_data[config_setting].encode('utf-8')
+        else:
+            new_config[setting] = config_data[config_setting]
+    return new_config
+
 
 
 class CombatUnit(object):
@@ -332,10 +330,12 @@ def unit_create_from_dict(stat_dict, default_skill_level=4):
             unit_weapons.append(stat_dict['weapons'][range_band])
         # TODO - verify this is a list with 3 entries
     except KeyError:
+        logging.error('Error setting weapon information for ' + unit_name)
         unit_weapons = [0, 0, 0]
     try:
         unit_move = stat_dict['move']
     except KeyError:
+        logging.error('Error setting move for ' + unit_name)
         unit_move = 0
     try:
         unit_skill = stat_dict['skill']
@@ -545,7 +545,7 @@ def range_for_least_defender_damage(attacker, defender):
             return LONG_RANGE
 
 
-def range_get(range_algorithm, current_round, initiative_winner, range_previous, unit_1, unit_2):
+def range_get(range_algorithm, current_round, range_previous, unit_1, unit_2):
     if unit_1.movement == 0 and unit_2.movement == 0:
         return range_previous
     if range_algorithm == SHORT_RANGE:
@@ -635,16 +635,77 @@ def range_get(range_algorithm, current_round, initiative_winner, range_previous,
             return range_for_least_defender_damage(slower_unit, faster_unit)
 
 
-def one_vs_one(first_unit, second_unit, range_algorithm):
+def woods_mod_calc(range_band, woods_percentages):
+    if range_band == SHORT_RANGE:
+        woods_percent = woods_percentages['short']
+    elif range_band == MEDIUM_RANGE:
+        woods_percent = woods_percentages['medium']
+    elif range_band == LONG_RANGE:
+        woods_percent = woods_percentages['long']
+    else:
+        logging.warning('Bad range band in woods_get. Setting to short.')
+        woods_percent = woods_percentages['short']
+    if random.random() * 100 < woods_percent:
+        return 2
+    else:
+        return 0
+
+
+def cover_mod_calc(range_band, cover_percentages):
+    if range_band == SHORT_RANGE:
+        cover_percent = cover_percentages['short']
+    elif range_band == MEDIUM_RANGE:
+        cover_percent = cover_percentages['medium']
+    elif range_band == LONG_RANGE:
+        cover_percent = cover_percentages['long']
+    else:
+        logging.warning('Bad range band in cover. Setting to short.')
+        cover_percent = cover_percentages['short']
+    if random.random() * 100 < cover_percent:
+        return 2
+    else:
+        return 0
+
+
+def range_algorithm_from_text(range_algorithm_description):
+    if range_algorithm_description == 'fixed_short':
+        range_determination_method = SHORT_RANGE
+    elif range_algorithm_description == 'fixed_medium':
+        range_determination_method = MEDIUM_RANGE
+    elif range_algorithm_description == 'fixed_long':
+        range_determination_method = LONG_RANGE
+    elif range_algorithm_description == 'random':
+        range_determination_method = RANDOM_RANGE
+    elif range_algorithm_description == 'fast_unit_causes_slow_approach':
+        range_determination_method = FAST_UNIT_CAUSES_SLOW_APPROACH
+    elif range_algorithm_description == 'fast_unit_minimizes_damage':
+        range_determination_method = FAST_UNIT_MINIMIZES_DAMAGE
+    # TODO - range_determination = initiative_helps_faster_minimize_hit_chance  ***NOT YET IMPLEMENTED***
+    # TODO - range_determination = initiative_helps_faster_maximize_damage  ***NOT YET IMPLEMENTED***
+    else:
+        logging.warning('Undefined range determination option: ' + range_algorithm_description + '; setting to short.')
+        range_determination_method = SHORT_RANGE
+    return range_determination_method
+
+
+def one_vs_one(first_unit, second_unit, config):
     round_count = 0
+    range_algorithm = range_algorithm_from_text(config['range_determination'])
     range_previous = LONG_RANGE
     while first_unit.structure > 0 and second_unit.structure > 0:
         round_count += 1
         logging.debug('========== ROUND ' + str(round_count) + ' ==========')
-        initiative_winner = random.randint(0, 1)
-        range_band = range_get(range_algorithm, round_count, initiative_winner, range_previous, first_unit, second_unit)
+        initiative_winner = random.randint(1, 2)
+        range_band = range_get(range_algorithm, round_count, range_previous, first_unit, second_unit)
         range_mod = 2 * range_band
         range_previous = range_band
+        woods_mod = woods_mod_calc(range_band, config['woods_percent'])
+        if initiative_winner == 1:
+            first_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_winner'])
+            second_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_loser'])
+        else:
+            first_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_loser'])
+            second_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_winner'])
         if first_unit.heat <= int(config['max_tolerable_heat']):
             # Compute first unit mods and roll to hit
             if first_unit.movement_mod() == 0:
@@ -656,7 +717,8 @@ def one_vs_one(first_unit, second_unit, range_algorithm):
             logging.debug(first_unit.name + ' shoots ' + second_unit.name)
             second_unit_was_hit = roll_to_hit(first_unit.effective_skill() + first_unit_mods,
                                               range_mod,
-                                              second_unit.movement_mod())
+                                              second_unit.movement_mod(),
+                                              terrain=woods_mod + second_unit_cover_mod)
             first_unit_fired = True
         else:
             logging.debug(first_unit.name + ' overheated; does not fire.')
@@ -673,7 +735,8 @@ def one_vs_one(first_unit, second_unit, range_algorithm):
             logging.debug(second_unit.name + ' shoots ' + first_unit.name)
             first_unit_was_hit = roll_to_hit(second_unit.effective_skill() + second_unit_mods,
                                              range_mod,
-                                             first_unit.movement_mod())
+                                             first_unit.movement_mod(),
+                                             terrain=woods_mod + first_unit_cover_mod)
             second_unit_fired = True
         else:
             logging.debug(first_unit.name + ' overheated; does not fire.')
@@ -722,103 +785,81 @@ def one_vs_one(first_unit, second_unit, range_algorithm):
     return {'winner': winner, 'rounds': round_count}
 
 
-if __name__ == "__main__":
+def main():
     try:
         config = config_read(CONFIG_FILE)
     except BaseException as why:
         print('Failed to read config file: ' + CONFIG_FILE)
         print('Error: ' + str(why))
         quit()
-    logging_configure(config['log_file_path'], int(config['log_level']))
+    logging_configure(config['log_file'], int(config['log_level']))
     unit_list = unit_list_read_from_json(config['unit_list_path'])
     random.seed()
-    # dice_test(100000)
     attacker_roll_total = 0
     attacker_rolls = 0
     defender_roll_total = 0
     defender_rolls = 0
-    if config['range_determination'] == 'fixed_short':
-        range_determination_method = SHORT_RANGE
-    elif config['range_determination'] == 'fixed_medium':
-        range_determination_method = MEDIUM_RANGE
-    elif config['range_determination'] == 'fixed_long':
-        range_determination_method = LONG_RANGE
-    elif config['range_determination'] == 'random':
-        range_determination_method = RANDOM_RANGE
-    elif config['range_determination'] == 'fast_unit_causes_slow_approach':
-        range_determination_method = FAST_UNIT_CAUSES_SLOW_APPROACH
-    elif config['range_determination'] == 'fast_unit_minimizes_damage':
-        range_determination_method = FAST_UNIT_MINIMIZES_DAMAGE
-    # TODO - range_determination = initiative_helps_faster_minimize_hit_chance  ***NOT YET IMPLEMENTED***
-    # TODO - range_determination = initiative_helps_faster_maximize_damage  ***NOT YET IMPLEMENTED***
 
-    if len(config['csv_output_file_path']) > 0:
-        csv_write = True
-        bbcode_write = False
+    if config['csv']['output']:
         try:
-            output_file_csv = open(config['csv_output_file_path'], 'wb')
+            output_file_csv = open(config['csv']['path'], 'wb')
         except BaseException as why:
-            logging.error('Failed to open CSV file ' + config['csv_output_file_path'] + ' - ' + str(why))
-            csv_write = False
-    else:
-        csv_write = False
-    if len(config['bbcode_output_file_path']) > 0:
-        bbcode_write = True
+            logging.error('Failed to open CSV file ' + config['csv']['path'] + ' - ' + str(why))
+            config['csv']['output'] = False
+    if config['bbcode']['output']:
         try:
-            output_file_bbcode = open(config['bbcode_output_file_path'], 'wb')
+            output_file_bbcode = open(config['bbcode']['path'], 'wb')
         except BaseException as why:
-            logging.error('Failed to open BBCode file ' + config['bbcode_output_file_path'] + ' - ' + str(why))
-            bbcode_write = False
-    else:
-        bbcode_write = False
+            logging.error('Failed to open BBCode file ' + config['bbcode']['path'] + ' - ' + str(why))
+            config['bbcode']['output'] = False
     defender_list = []
     completed_attackers = []
-    if bbcode_write:
+    if config['bbcode']['output']:
         output_file_bbcode.write('[table][tr][td]Attacker \ Defender[/td]')
-    if csv_write:
+    if config['csv']['output']:
         csv_fields = ['Attacker']
     for defender in unit_list:
         defender_list.append(defender)
-        if bbcode_write:
-            output_file_bbcode.write('[td]' + defender['name'] + '[/td]')
-        if csv_write:
+        if config['bbcode']['output']:
+            output_file_bbcode.write('[td][b]' + defender['name'] + ' (Skill ' + str(defender['skill']) + ')[/b][/td]')
+        if config['csv']['output']:
             csv_fields.append(defender['name'])
-    if bbcode_write:
+    if config['bbcode']['output']:
         output_file_bbcode.write('[/tr]')
-    if csv_write:
+    if config['csv']['output']:
         csv_writer = csv.DictWriter(output_file_csv, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
                                     fieldnames=csv_fields)
         csv_writer.writeheader()
     for attacker in unit_list:
-        if bbcode_write:
-            output_file_bbcode.write('[tr][td]' + attacker['name'] + '[/td]')
-        if csv_write:
+        if config['bbcode']['output']:
+            output_file_bbcode.write('[tr][td][b]' + attacker['name'] + ' (Skill ' + str(attacker['skill']) + ')[/b][/td]')
+        if config['csv']['output']:
             csv_line = {'Attacker': attacker['name']}
         for defender in defender_list:
             if attacker['name'] == defender['name']:
                 logging.debug('Identical units; skipping.')
-                if bbcode_write:
+                if config['bbcode']['output']:
                     output_file_bbcode.write('[td]-----[/td]')
-                if csv_write:
+                if config['csv']['output']:
                     csv_line[defender['name']] = 'N/A'
                 continue
             if attacker['name'] in completed_attackers:
                 # TODO - this isn't working
                 logging.debug('Pairing already run; skipping.')
-                if bbcode_write:
+                if config['bbcode']['output']:
                     output_file_bbcode.write('[td]-----[/td]')
-                if csv_write:
+                if config['csv']['output']:
                     csv_line[defender['name']] = 'N/A'
                 continue
             wins = [0, 0, 0]  # Ties, Attacker, Defender
             rounds = 0
             for battle in range(0, int(config['battle_runs'])):
-                attacking_unit = unit_create_from_dict(attacker, default_skill_level=int(config['skill_level_default']))
-                defending_unit = unit_create_from_dict(defender, default_skill_level=int(config['skill_level_default']))
-                result_dict = one_vs_one(attacking_unit, defending_unit, range_determination_method)
+                attacking_unit = unit_create_from_dict(attacker, default_skill_level=int(config['skill_default']))
+                defending_unit = unit_create_from_dict(defender, default_skill_level=int(config['skill_default']))
+                result_dict = one_vs_one(attacking_unit, defending_unit, config)
                 wins[result_dict['winner']] += 1
                 rounds += result_dict['rounds']
-            if bbcode_write:
+            if config['bbcode']['output']:
                 if wins[1] > wins[2]:
                     output_file_bbcode.write('[td]' + attacker['name'] + ': ' + str(wins[1]) + '/' + str(wins[2]) +
                                              '/' + str(wins[0]) + '(' +
@@ -835,7 +876,7 @@ if __name__ == "__main__":
             logging.critical('Ties: ' + str(wins[0]))
             logging.critical('Average battle length: ' +
                              str(round(float(rounds) / float(int(config['battle_runs'])), 1)))
-            if csv_write:
+            if config['csv']['output']:
                 if wins[1] > wins[2]:
                     output_text = attacker['name'] + ':' + str(wins[1]) + '/' + str(wins[2]) + '/' + \
                                   str(wins[0]) + '(' + str(round(float(rounds) / float(config['battle_runs']), 1)) + ')'
@@ -844,12 +885,16 @@ if __name__ == "__main__":
                                   str(wins[0]) + '(' + str(round(float(rounds) / float(config['battle_runs']), 1)) + ')'
                 csv_line[defender['name']] = output_text
         completed_attackers.append(attacker['name'])
-        if bbcode_write:
+        if config['bbcode']['output']:
             output_file_bbcode.write('[/tr]')
-        if csv_write:
+        if config['csv']['output']:
             csv_writer.writerow(csv_line)
-    if bbcode_write:
+    if config['bbcode']['output']:
         output_file_bbcode.write('[/table]')
         output_file_bbcode.close()
-    if csv_write:
+    if config['csv']['output']:
         output_file_csv.close()
+
+
+if __name__ == "__main__":
+    main()

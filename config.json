@@ -1,0 +1,43 @@
+{
+  "unit_list_path": "unit_lists/skill_cgr.json",
+  "log_level": 30,
+  "log_file": "",
+  "battle_runs": 1000,
+  "csv": {
+    "output": false,
+    "path": "c:/temp/alphastrike.csv"
+  },
+  "bbcode": {
+    "output": true,
+    "path": "c:/temp/alphastrike.txt"
+  },
+  "skill_default": 4,
+  "max_tolerable_heat": 1,
+  "range_determination": "fast_unit_causes_slow_approach",
+  "range_determination_options": [
+    "fixed_short",
+    "fixed_medium",
+    "fixed_long",
+    "random",
+    "fast_unit_minimizes_damage",
+    "fast_unit_causes_slow_approach"
+  ],
+  "woods_percent": {
+    "short": 10,
+    "medium": 30,
+    "long": 50
+  },
+  "cover_percent": {
+    "initiative_winner": {
+      "short": 10,
+      "medium": 30,
+      "long": 50
+    },
+    "initiative_loser": {
+      "short": 10,
+      "medium": 30,
+      "long": 50
+    }
+  }
+}
+

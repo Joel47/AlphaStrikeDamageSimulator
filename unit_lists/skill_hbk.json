@@ -1,0 +1,7 @@
+[
+  {"name":"Hunchback IIC (IV)", "points":26, "skill":4, "type":0, "armor":3, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE"]},
+  {"name":"Hunchback IIC (III)", "points":31, "skill":3, "type":0, "armor":3, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE"]},
+  {"name":"Hunchback IIC (II)", "points":36, "skill":2, "type":0, "armor":3, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE"]},
+  {"name":"Hunchback IIC (I)", "points":41, "skill":1, "type":0, "armor":3, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE"]},
+  {"name":"Hunchback IIC", "points":46, "skill":0, "type":0, "armor":3, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE"]}
+]

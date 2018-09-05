@@ -1,0 +1,10 @@
+[
+  {"name":"Charger CGR-1L", "points":26, "skill":4, "type":0, "armor":3, "structure":6, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+  {"name":"Vulcan VT-6M", "points":26, "skill":3, "type":0, "armor":3, "structure":2, "weapons":[2, 2, 1], "move":12},
+  {"name":"Falcon FLC-4Nb", "points":26, "skill":3, "type":0, "armor":3, "structure":3, "weapons":[2, 2, 0], "move":12, "special":["ENE"]},
+  {"name":"Commando COM-7B", "points":26, "skill":2, "type":0, "armor":2, "structure":1, "weapons":[3, 2, 0], "move":12, "special":["CASE"]},
+  {"name":"Panther PNT-9R (Tanaka)", "points":26, "skill":2, "type":0, "armor":3, "structure":3, "weapons":[2, 2, 0], "move":8},
+  {"name":"Hussar HSR-300-D", "points":26, "skill":1, "type":0, "armor":1, "structure":3, "weapons":[1, 1, 0], "move":18, "special":["ENE"]},
+  {"name":"Commando COM-4H", "points":26, "skill":1, "type":0, "armor":2, "structure":2, "weapons":[2, 2, 0], "move":12},
+  {"name":"Wasp WSP-8T", "points":26, "skill":0, "type":0, "armor":2, "structure":1, "weapons":[1, 1, 1], "move":12}
+]

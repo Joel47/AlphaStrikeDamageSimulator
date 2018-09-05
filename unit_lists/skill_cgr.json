@@ -1,0 +1,7 @@
+[
+  {"name":"Charger CGR-1L IV", "points":26, "skill":4, "type":0, "armor":3, "structure":6, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+  {"name":"Charger CGR-1L III", "points":26, "skill":3, "type":0, "armor":3, "structure":6, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+  {"name":"Charger CGR-1L II", "points":26, "skill":2, "type":0, "armor":3, "structure":6, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+  {"name":"Charger CGR-1L I", "points":26, "skill":1, "type":0, "armor":3, "structure":6, "weapons":[2, 2, 0], "move":10, "special":["ENE"]},
+  {"name":"Charger CGR-1L 0", "points":26, "skill":0, "type":0, "armor":3, "structure":6, "weapons":[2, 2, 0], "move":10, "special":["ENE"]}
+]

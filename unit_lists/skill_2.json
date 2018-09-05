@@ -1,0 +1,12 @@
+[
+  {"name":"Black Hawk-KU BHKU-O", "points":46, "skill":4, "type":0, "armor":7, "structure":3, "weapons":[6, 5, 0], "move":10, "special":["ENE"]},
+  {"name":"Thor II C", "points":46, "skill":4, "type":0, "armor":6, "structure":4, "weapons":[5, 5, 3], "move":10, "special":["CASE"]},
+  {"name":"Banshee BNC-3E", "points":46, "skill":3, "type":0, "armor":8, "structure":8, "weapons":[2, 2, 2], "move":8},
+  {"name":"Lynx LNX-9Q", "points":46, "skill":3, "type":0, "armor":6, "structure":3, "weapons":[4, 4, 1], "move":10, "special":["ENE"]},
+  {"name":"Hammerhands HMH-4D", "points":47, "skill":2, "type":0, "armor":6, "structure":6, "weapons":[3, 3, 1], "move":6},
+  {"name":"Battle Cobra A", "points":47, "skill":2, "type":0, "armor":4, "structure":3, "weapons":[4, 4, 0], "move":12, "special":["ENE"]},
+  {"name":"Rifleman RFL-3C", "points":46, "skill":1, "type":0, "armor":5, "structure":5, "weapons":[3, 3, 0], "move":8},
+  {"name":"Peregrine (Horned Owl)", "points":46, "skill":1, "type":0, "armor":3, "structure":3, "weapons":[3, 3, 2], "move":12, "special":["ENE"]},
+  {"name":"Hunchback IIC", "points":46, "skill":0, "type":0, "armor":3, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE"]},
+  {"name":"Sentinel STN-3Lb", "points":46, "skill":0, "type":0, "armor":4, "structure":2, "weapons":[3, 2, 2], "move":12}
+]
