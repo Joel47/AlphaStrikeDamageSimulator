@@ -6,7 +6,7 @@ import csv
 import json
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.json')
-__version__ = 1.5
+__version__ = 1.6
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -63,7 +63,7 @@ def config_read(json_path):
 
 class CombatUnit(object):
 
-    def __init__(self, name, unit_type, armor, structure, weapons, movement, skill, motive_type=0, special=None):
+    def __init__(self, name, unit_type, armor, structure, weapons, movement, skill, motive_type=0, jump=None, special=None):
         self.name = name
         self.type = unit_type
         self.armor = armor
@@ -73,6 +73,7 @@ class CombatUnit(object):
         self.weapons = list(weapons)
         self.movement = movement
         self.motive_type = motive_type
+        self.jump = jump
         self.skill = skill
         if not (special is None):
             self.special = list(special)
@@ -85,9 +86,13 @@ class CombatUnit(object):
         misc_bonuses = 0
         if 'SHLD' in self.special:
             misc_bonuses += 1
+        if self.jump is not None:
+            if self.jump > self.movement:
+                misc_bonuses += 2
         return self.skill + self.heat + misc_bonuses
 
     def effective_movement(self):
+        # Does NOT include jump
         return max(0, self.movement - (self.heat * 2))
 
     def movement_mod(self):
@@ -97,7 +102,11 @@ class CombatUnit(object):
                 other_mods -= 1
         if self.type == PROTOMECH or self.type == BATTLEARMOR:
             other_mods += 1
-        return movement_mod(self.effective_movement()) + other_mods
+        move_mod = movement_mod(self.effective_movement())
+        if self.jump is not None:
+            if self.jump > self.movement:
+                move_mod = movement_mod(self.jump) + 1
+        return move_mod + other_mods
 
     def damage_apply(self, damage, attack_range=SHORT_RANGE, attacker_specials='', is_area_effect=False):
         logging.debug('Applying ' + str(damage) + ' damage to ' + self.name)
@@ -346,11 +355,15 @@ def unit_create_from_dict(stat_dict, default_skill_level=4):
     except KeyError:
         unit_motive = 0
     try:
+        unit_jump = stat_dict['jump']
+    except KeyError:
+        unit_jump = None
+    try:
         unit_special = stat_dict['special']
     except KeyError:
         unit_special = []
     return CombatUnit(unit_name, unit_type, unit_armor, unit_structure, unit_weapons, unit_move, unit_skill,
-                      unit_motive, unit_special)
+                      unit_motive, jump=unit_jump, special=unit_special)
 
 
 def unit_list_read_from_json(json_path):

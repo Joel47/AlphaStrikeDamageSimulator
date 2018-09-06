@@ -1,0 +1,13 @@
+[
+  {"name":"Thunderbolt TDR-5S", "points":42, "skill":3, "type":0, "armor":7, "structure":5, "weapons":[3, 3, 1], "move":8, "special":["IF1"]},
+  {"name":"Shadow Hawk SHD-5M", "points":41, "skill":3, "type":0, "armor":6, "structure":3, "weapons":[2, 3, 2], "move":10, "special":["CASE","IF1"]},
+  {"name":"Fire Moth G", "points":43, "skill":3, "type":0, "armor":1, "structure":1, "weapons":[4, 4, 0], "move":30, "special":["CASE", "OMNI"]},
+  {"name":"Shadow Cat II 2", "points":42, "skill":3, "type":0, "armor":5, "structure":3, "weapons":[3, 3, 3], "move":12, "special":["CASE","IF1"]},
+  {"name":"Shadow Cat II 2j", "points":42, "skill":3, "type":0, "armor":5, "structure":3, "weapons":[3, 3, 3], "move":12, "jump":16, "special":["CASE","IF1"]},
+  {"name":"Pouncer E", "points":43, "skill":3, "type":0, "armor":4, "structure":2, "weapons":[6, 4, 2], "move":12, "special":["CASE", "OMNI"]},
+  {"name":"Marauder MAD-3R", "points":41, "skill":3, "type":0, "armor":6, "structure":6, "weapons":[2, 3, 3], "move":8},
+  {"name":"Firestarter FS9-OU", "points":42, "skill":3, "type":0, "armor":5, "structure":2, "weapons":[4, 4, 0], "move":12},
+  {"name":"Hatchetman HCT-7R", "points":42, "skill":3, "type":0, "armor":5, "structure":2, "weapons":[4, 4, 0], "move":10, "special":["ENE", "MEL"]},
+  {"name":"Rifleman RFL-7M", "points":42, "skill":3, "type":0, "armor":5, "structure":3, "weapons":[4, 4, 2], "move":8, "special":["ECM"]},
+  {"name":"Cougar B", "points":41, "skill":3, "type":0, "armor":4, "structure":2, "weapons":[4, 4, 3], "move":10, "special":["ENE", "OMNI"]}
+]
