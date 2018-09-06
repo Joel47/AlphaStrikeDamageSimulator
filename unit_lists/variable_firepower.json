@@ -1,0 +1,8 @@
+[
+  {"name":"Hellhound/Conjurer", "skill":3, "type":0, "armor":5, "structure":4, "weapons":[3, 3, 2], "move":12, "jump":12, "special":["CASE"]},
+  {"name":"Nova Prime", "skill":3, "type":0, "armor":5, "structure":3, "weapons":[5, 5, 0], "move":10, "jump":10, "special":["ENE"]},
+  {"name":"Nova A", "skill":2, "type":0, "armor":5, "structure":3, "weapons":[3, 3, 3], "move":10, "jump":10, "special":["AMS", "CASE"]},
+  {"name":"Dragon DRG-7N ", "skill":2, "type":0, "armor":5, "structure":3, "weapons":[3, 4, 2], "move":10, "special":["CASE"]},
+  {"name":"Nova C", "skill":1, "type":0, "armor":5, "structure":3, "weapons":[2, 3, 2], "move":10, "jump":10, "special":["CASE"]},
+  {"name":"Watchman WTC-4DM", "skill":1, "type":0, "armor":5, "structure":3, "weapons":[3, 3, 1], "move":10, "jump":10, "special":["ENE"]}
+]

@@ -6,7 +6,7 @@ import csv
 import json
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.json')
-__version__ = 1.6
+__version__ = 1.7
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -568,17 +568,14 @@ def range_get(range_algorithm, current_round, range_previous, unit_1, unit_2):
     elif range_algorithm == LONG_RANGE:
         return MEDIUM_RANGE
     elif range_algorithm == RANDOM_RANGE:
-        if current_round == 1:
-            logging.debug('Randomly determined range: First round; long range.')
-            return LONG_RANGE
-        elif current_round == 2:
-            logging.debug('Randomly determined range: Second round; medium range.')
+        # Randomly choose between short and medium range
+        range_roll = random.randint(1, 100)
+        if range_roll <= 10:
+            return SHORT_RANGE
+        elif range_roll <= 70:
             return MEDIUM_RANGE
         else:
-            # Randomly choose between short and medium range
-            new_range = random.randint(0, 1)
-            logging.debug('Randomly determined range: ' + str(new_range))
-            return new_range
+            return LONG_RANGE
     elif range_algorithm == FAST_UNIT_CAUSES_SLOW_APPROACH:
         if unit_1.movement > unit_2.movement:
             faster_unit = unit_1

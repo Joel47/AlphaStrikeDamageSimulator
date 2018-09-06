@@ -1,0 +1,8 @@
+[
+  {"name":"Zeus ZEU-5T", "points":40, "skill":4, "type":0, "armor":7, "structure":6, "weapons":[3, 4, 3], "move":8, "special":["IF1"]},
+  {"name":"Trebuchet TBT-9K", "points":37, "skill":3, "type":0, "armor":5, "structure":2, "weapons":[4, 4, 0], "move":10, "special":["CASE","C3S"]},
+  {"name":"Vixen 4", "points":36, "skill":2, "type":0, "armor":4, "structure":2, "weapons":[3, 3, 0], "move":18, "special":["ENE"]},
+  {"name":"Warhammer WHM-11T", "points":32, "skill":1, "type":0, "armor":6, "structure":3, "weapons":[3, 3, 2], "move":8, "special":["CASE","IF0"]},
+  {"name":"Warhammer WHM-11Tj", "points":32, "skill":1, "type":0, "armor":6, "structure":3, "weapons":[3, 3, 2], "move":8, "jump":10, "special":["CASE","IF0"]},
+  {"name":"Whitworth WTH-2A", "points":29, "skill":0, "type":0, "armor":4, "structure":3, "weapons":[4, 4, 0], "move":8, "special":["CASE", "C3S"]}
+]

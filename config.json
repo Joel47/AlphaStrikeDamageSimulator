@@ -1,5 +1,5 @@
 {
-  "unit_list_path": "unit_lists/scotty_1.json",
+  "unit_list_path": "unit_lists/variable_firepower.json",
   "log_level": 30,
   "log_file": "",
   "battle_runs": 10000,
@@ -13,7 +13,7 @@
   },
   "skill_default": 4,
   "max_tolerable_heat": 1,
-  "range_determination": "fixed_medium",
+  "range_determination": "random",
   "range_determination_options": [
     "fixed_short",
     "fixed_medium",
