@@ -1,5 +1,7 @@
 {
-  "unit_list_path": "unit_lists/synthetic.json",
+  "unit_list_path": "unit_lists/synthetic_units.json",
+  "attacker_list": ["SmallLight1", "SmallLight2", "SmallLight3", "SmallLight4", "SmallLight5", "SmallLight6", "SmallLight7", "SmallLight8", "SmallLight9"],
+  "defender_list": ["SkilledSmallLight1", "SkilledSmallLight2", "SkilledSmallLight3", "SkilledSmallLight4", "SkilledSmallLight5", "SkilledSmallLight6", "SkilledSmallLight7", "SkilledSmallLight8", "SkilledSmallLight9"],
   "log_level": 30,
   "log_file": "",
   "battle_runs": 10000,
@@ -8,7 +10,7 @@
     "path": "c:/temp/alphastrike.csv"
   },
   "bbcode": {
-    "output": true,
+    "output": false,
     "path": "c:/temp/alphastrike.txt"
   },
   "skill_default": 4,

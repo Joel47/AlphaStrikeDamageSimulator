@@ -4,9 +4,11 @@ import shutil
 import random
 import csv
 import json
+import argparse
+import sys
 
+__version__ = 1.8
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.json')
-__version__ = 1.7
 
 # Constants for use below
 MAX_ROUNDS = 100  # Avoid runaways
@@ -42,28 +44,42 @@ ATTACKER = 0
 DEFENDER = 0
 
 
-def config_read(json_path):
-    if not os.path.isfile(json_path):
-        raise IOError('Missing config file at ' + json_path)
-    new_config = {}
-    with open(json_path, 'r+') as user_data:
-        try:
-            config_data = json.load(user_data)
-        except BaseException as why:
-            raise IOError('Error loading config file ' + json_path + ': ' + str(why))
-    for config_setting in config_data:
-        setting = config_setting.decode('utf-8')
-        if isinstance(config_data[setting], unicode):
-            new_config[setting] = config_data[config_setting].encode('utf-8')
-        else:
-            new_config[setting] = config_data[config_setting]
-    return new_config
-
+config = {
+    "unit_list_path": 'unit_lists/synthetic.json',
+    "attacker": None,
+    "defender": None,
+    "attacker_list": [],
+    "defender_list": [],
+    "log_level": 30,
+    "log_file": "",
+    "battle_runs": 1000,
+    "csv": {
+        "output": False,
+        "path": "c:/temp/alphastrike.csv"
+    },
+    "bbcode": {
+        "output": False,
+        "path": "c:/temp/alphastrike.txt"
+    },
+    "max_tolerable_heat": 1,
+    "range_determination": "random",
+    "woods_percent": {
+        "short": 10,
+        "medium": 30,
+        "long": 50
+    },
+    "cover_percent": {
+        "short": 10,
+        "medium": 30,
+        "long": 50
+    }
+}
 
 
 class CombatUnit(object):
 
-    def __init__(self, name, unit_type, armor, structure, weapons, movement, skill, motive_type=0, jump=None, special=None):
+    def __init__(self, name, unit_type=MECH, armor=1, structure=1, weapons=[0,0,0], movement=0, skill=4,
+                 motive_type=0, jump=None, special=[]):
         self.name = name
         self.type = unit_type
         self.armor = armor
@@ -291,6 +307,7 @@ class CombatUnit(object):
         for crit in self.crits[:]:
             if crit in ['Crew Stunned']:
                 self.crits.remove(crit)
+                logging.debug('Crit expired: ' + crit)
 
     def state_log(self):
         logging.debug(self.name + ': ' + str(self.armor) + '/' + str(self.structure) + ' ' +
@@ -315,7 +332,7 @@ class CombatUnit(object):
                 self.special.remove('RHS')
 
 
-def unit_create_from_dict(stat_dict, default_skill_level=4):
+def unit_create_from_dict(stat_dict):
     # name, type, armor, structure, weapons, movement, skill, motive_type=0, special=None
     try:
         unit_name = stat_dict['name']
@@ -349,7 +366,7 @@ def unit_create_from_dict(stat_dict, default_skill_level=4):
     try:
         unit_skill = stat_dict['skill']
     except KeyError:
-        unit_skill = default_skill_level
+        unit_skill = 4
     try:
         unit_motive = stat_dict['motive']
     except KeyError:
@@ -698,24 +715,19 @@ def range_algorithm_from_text(range_algorithm_description):
     return range_determination_method
 
 
-def one_vs_one(first_unit, second_unit, config):
+def one_vs_one(first_unit, second_unit):
     round_count = 0
     range_algorithm = range_algorithm_from_text(config['range_determination'])
     range_previous = LONG_RANGE
     while first_unit.structure > 0 and second_unit.structure > 0:
         round_count += 1
         logging.debug('========== ROUND ' + str(round_count) + ' ==========')
-        initiative_winner = random.randint(1, 2)
         range_band = range_get(range_algorithm, round_count, range_previous, first_unit, second_unit)
         range_mod = 2 * range_band
         range_previous = range_band
         woods_mod = woods_mod_calc(range_band, config['woods_percent'])
-        if initiative_winner == 1:
-            first_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_winner'])
-            second_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_loser'])
-        else:
-            first_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_loser'])
-            second_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent']['initiative_winner'])
+        first_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent'])
+        second_unit_cover_mod = cover_mod_calc(range_band, config['cover_percent'])
         if first_unit.heat <= int(config['max_tolerable_heat']):
             # Compute first unit mods and roll to hit
             if first_unit.movement_mod() == 0:
@@ -795,21 +807,80 @@ def one_vs_one(first_unit, second_unit, config):
     return {'winner': winner, 'rounds': round_count}
 
 
-def main():
+def config_set_from_command_line():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default=CONFIG_FILE,
+                        help='JSON file that will override settings in script, but be overridden by command line',
+                        dest='config_file')
+    parser.add_argument('--config_print', help='Display all configuration options with their current setting',
+                        action="store_true")
+    for argument in config:
+        if isinstance(config[argument], bool):
+            parser.add_argument('--' + argument, action="store_true")
+        elif isinstance(config[argument], int):
+            parser.add_argument('--' + argument, type=int)
+        elif isinstance(config[argument], float):
+            parser.add_argument('--' + argument, type=float)
+        elif isinstance(config[argument], list):
+            parser.add_argument('--' + argument, action="append")
+        else:
+            parser.add_argument('--' + argument)
     try:
-        config = config_read(CONFIG_FILE)
+        args = parser.parse_args()
     except BaseException as why:
-        print('Failed to read config file: ' + CONFIG_FILE)
-        print('Error: ' + str(why))
-        quit()
-    logging_configure(config['log_file'], int(config['log_level']))
-    unit_list = unit_list_read_from_json(config['unit_list_path'])
-    random.seed()
-    attacker_roll_total = 0
-    attacker_rolls = 0
-    defender_roll_total = 0
-    defender_rolls = 0
+        if str(why) != '0':
+            print('Command line error: ' + str(why))
+            try:
+                print(parser.print_help())
+            except BaseException as print_error:
+                print('Parser error: ' + str(print_error))
+        sys.exit(1)
+    if args.config_file is not None:
+        json_path = args.config_file
+    if json_path is not None:
+        # Read JSON file, overwrite default config values with anything found & add new params
+        if not os.path.isfile(json_path):
+            raise IOError('Missing config file at ' + json_path)
+        with open(json_path, 'r+') as user_data:
+            try:
+                config_data = json.load(user_data)
+            except BaseException as why:
+                raise IOError('Error loading config file ' + json_path + ': ' + str(why))
+        for config_setting in config_data:
+            setting = config_setting.decode('utf-8')
+            if isinstance(config_data[setting], basestring):
+                config[setting] = config_data[config_setting].decode('utf-8')
+            elif isinstance(config_data[setting], list):
+                new_list = []
+                for list_item in config_data[setting]:
+                    if isinstance(list_item, basestring):
+                        new_list.append(list_item.decode('utf-8'))
+                    else:
+                        new_list.append(list_item)
+                config[setting] = list(new_list)
+            else:
+                config[setting] = config_data[config_setting]
+    # Read command line, overwrite default config values with anything found & add new params
+    for arg in vars(args):
+        if getattr(args, arg) is not None:
+            if getattr(args, arg):
+                config[arg] = getattr(args, arg)
+    if args.config_print:
+        config_print()
 
+
+def config_print(setting=None):
+    if setting is not None:
+        try:
+            print(str(config[setting]))
+        except:
+            print('No config option "' + setting + '"')
+    else:
+        for option in config:
+            print option + ': ' + str(config[option])
+
+
+def unit_list_fight(unit_list):
     if config['csv']['output']:
         try:
             output_file_csv = open(config['csv']['path'], 'wb')
@@ -864,9 +935,9 @@ def main():
             wins = [0, 0, 0]  # Ties, Attacker, Defender
             rounds = 0
             for battle in range(0, int(config['battle_runs'])):
-                attacking_unit = unit_create_from_dict(attacker, default_skill_level=int(config['skill_default']))
-                defending_unit = unit_create_from_dict(defender, default_skill_level=int(config['skill_default']))
-                result_dict = one_vs_one(attacking_unit, defending_unit, config)
+                attacking_unit = unit_create_from_dict(attacker)
+                defending_unit = unit_create_from_dict(defender)
+                result_dict = one_vs_one(attacking_unit, defending_unit)
                 wins[result_dict['winner']] += 1
                 rounds += result_dict['rounds']
             if config['bbcode']['output']:
@@ -904,6 +975,131 @@ def main():
         output_file_bbcode.close()
     if config['csv']['output']:
         output_file_csv.close()
+
+
+def list_vs_list(attacker_list, defender_list):
+    if config['csv']['output']:
+        try:
+            output_file_csv = open(config['csv']['path'], 'wb')
+        except BaseException as why:
+            logging.error('Failed to open CSV file ' + config['csv']['path'] + ' - ' + str(why))
+            config['csv']['output'] = False
+    if config['bbcode']['output']:
+        try:
+            output_file_bbcode = open(config['bbcode']['path'], 'wb')
+        except BaseException as why:
+            logging.error('Failed to open BBCode file ' + config['bbcode']['path'] + ' - ' + str(why))
+            config['bbcode']['output'] = False
+    if config['bbcode']['output']:
+        output_file_bbcode.write('[table][tr][td]Attacker \ Defender[/td]')
+    if config['csv']['output']:
+        csv_fields = ['Attacker']
+    for defender in defender_list:
+        if config['bbcode']['output']:
+            output_file_bbcode.write('[td][b]' + defender['name'] + ' (Skill ' + str(defender['skill']) + ')[/b][/td]')
+        if config['csv']['output']:
+            csv_fields.append(defender['name'])
+    if config['bbcode']['output']:
+        output_file_bbcode.write('[/tr]')
+    if config['csv']['output']:
+        csv_writer = csv.DictWriter(output_file_csv, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL,
+                                    fieldnames=csv_fields)
+        csv_writer.writeheader()
+    for attacker in attacker_list:
+        if config['bbcode']['output']:
+            output_file_bbcode.write('[tr][td][b]' + attacker['name'] + ' (Skill ' + str(attacker['skill']) + ')[/b][/td]')
+        if config['csv']['output']:
+            csv_line = {'Attacker': attacker['name']}
+        for defender in defender_list:
+            wins = [0, 0, 0]  # Ties, Attacker, Defender
+            rounds = 0
+            for battle in range(0, int(config['battle_runs'])):
+                attacking_unit = unit_create_from_dict(attacker)
+                defending_unit = unit_create_from_dict(defender)
+                result_dict = one_vs_one(attacking_unit, defending_unit)
+                wins[result_dict['winner']] += 1
+                rounds += result_dict['rounds']
+            if config['bbcode']['output']:
+                output_file_bbcode.write('[td]' + str(wins[1]) + '/' + str(wins[2]) +
+                                         '/' + str(wins[0]) + '/' +
+                                         str(round(float(rounds) / float(int(config['battle_runs'])), 1)) +
+                                         '[/td]')
+            logging.critical('====================')
+            logging.critical(attacker['name'] + ': ' + str(wins[1]))
+            logging.critical(defender['name'] + ': ' + str(wins[2]))
+            logging.critical('Ties: ' + str(wins[0]))
+            logging.critical('Average battle length: ' +
+                             str(round(float(rounds) / float(int(config['battle_runs'])), 1)))
+            if config['csv']['output']:
+                output_text = str(wins[1]) + '/' + str(wins[2]) + '/' + \
+                              str(wins[0]) + '/' + str(round(float(rounds) / float(config['battle_runs']), 1))
+                csv_line[defender['name']] = output_text
+        if config['bbcode']['output']:
+            output_file_bbcode.write('[/tr]')
+        if config['csv']['output']:
+            csv_writer.writerow(csv_line)
+    if config['bbcode']['output']:
+        output_file_bbcode.write('[/table]')
+        output_file_bbcode.close()
+    if config['csv']['output']:
+        output_file_csv.close()
+
+
+def combatant_stat_string(combatant):
+    stat_string = combatant['name'] + ': '
+    stat_list = ['Skill', 'Points', 'Type', 'Armor', 'Structure', 'Weapons', 'Move', 'Jump', 'Special']
+    for stat_item in stat_list:
+        if stat_item.lower() in combatant:
+            stat_string += stat_item + ': ' + str(combatant[stat_item.lower()]) + ', '
+    stat_string = stat_string.rstrip(', ')
+    return stat_string
+
+
+def single_fight(attacker, defender):
+    logging.critical(combatant_stat_string(attacker))
+    logging.critical(combatant_stat_string(defender))
+    wins = [0, 0, 0]  # Ties, Attacker, Defender
+    rounds = 0
+    for battle in range(0, int(config['battle_runs'])):
+        attacking_unit = unit_create_from_dict(attacker)
+        defending_unit = unit_create_from_dict(defender)
+        result_dict = one_vs_one(attacking_unit, defending_unit)
+        wins[result_dict['winner']] += 1
+        rounds += result_dict['rounds']
+    logging.critical('====================')
+    logging.critical(attacker['name'] + ': ' + str(wins[1]))
+    logging.critical(defender['name'] + ': ' + str(wins[2]))
+    logging.critical('Ties: ' + str(wins[0]))
+    logging.critical('Average battle length: ' +
+                     str(round(float(rounds) / float(int(config['battle_runs'])), 1)))
+
+
+def unit_from_list_by_name(name, unit_list):
+    for unit in unit_list:
+        if name == unit['name']:
+            return unit
+    raise RuntimeError('Unit "' + name + '" not found in unit list.')
+
+
+def main():
+    config_set_from_command_line()
+    logging_configure(config['log_file'], int(config['log_level']))
+    random.seed()
+    unit_list = unit_list_read_from_json(config['unit_list_path'])
+    if config['attacker'] is not None and config['defender'] is not None:
+        attacker = unit_from_list_by_name(config['attacker'], unit_list)
+        defender = unit_from_list_by_name(config['defender'], unit_list)
+        single_fight(attacker, defender)
+    elif len(config['attacker_list']) > 0 and len(config['defender_list']) > 0:
+        attacker_list = []
+        defender_list = []
+        for attacker in config['attacker_list']:
+            attacker_list.append(unit_from_list_by_name(attacker, unit_list))
+        for defender in config['defender_list']:
+            defender_list.append(unit_from_list_by_name(defender, unit_list))
+        list_vs_list(attacker_list, defender_list)
+    else:
+        unit_list_fight(unit_list)
 
 
 if __name__ == "__main__":
